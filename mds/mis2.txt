@@ -1,0 +1,5 @@
+The one real issue: data-model.md was not updated. Its notification_events CHECK constraint still enumerates only the six old event types — no order_released — and my grep found zero mentions of release in that file. Since the migration SQL will likely be generated from the data model, the first release event would violate the CHECK and the dispatch would fail. research.md R-004 has the same stale six-type list. Both are one-line edits.
+
+One small nit while you're in there: research.md R-002's phrase "stay within the database transaction boundary" still implies pg_net is synchronous — it actually dispatches after commit, which is what you want; just worth rewording so a task author doesn't try to make it transactional.
+
+So: fix the notification_events CHECK in data-model.md (add order_released), optionally sync research.md, and then this plan is genuinely clean — architecture is consistent with the codebase's 003 patterns (GUC-scoped triggers, signal-table precedent, grant discipline), the constitution table holds up, and the scope controls are explicit. Ready for /speckit-tasks whenever you are.

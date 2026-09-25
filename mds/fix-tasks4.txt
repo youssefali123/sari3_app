@@ -1,0 +1,279 @@
+Review `/specs/004-push-notifications/tasks.md` against the current `/specs/004-push-notifications/plan.md`, `spec.md`, `research.md`, `data-model.md`, `contracts/`, and `quickstart.md`.
+
+Do NOT rewrite the feature from scratch. Preserve the current structure, user stories, priorities, checkpoints, and implementation strategy unless a task conflicts with the approved design.
+
+Apply the following corrections before implementation:
+
+### 1. Fix notification event idempotency
+
+The current T008 says:
+
+`dedupe_key = order_id:event_type:1 + count of existing rows for that order`
+
+Do NOT use `COUNT(*)` or another race-prone derived ordinal to generate dedupe identities.
+
+Replace this with a stable event/transition identity that is guaranteed to be unique for the actual order status transition.
+
+Requirements:
+
+* Repeated trigger execution for the same logical transition MUST resolve to the same dedupe identity.
+* Concurrent executions MUST NOT be able to create duplicate logical notification events.
+* Database uniqueness MUST enforce the invariant.
+* `released` MUST support multiple legitimate release cycles for the same order.
+* Do NOT use `UNIQUE(order_id, event_type)` because the same order may legitimately emit `order_released` more than once.
+* Use the existing schema/model from `data-model.md` if it already provides a transition/event identity.
+* If the current schema does not provide one, explicitly add the minimum DB mechanism required to generate a stable per-transition identity. Do not invent a client-generated ID.
+* Update `data-model.md`, contracts, and affected tasks if this requires a schema change.
+
+### 2. Clarify notification_events responsibility
+
+`notification_events` represents durable notification events, not a precomputed permanent recipient list.
+
+The Edge Function MUST resolve recipients server-side at dispatch time.
+
+For customer lifecycle events:
+
+* Resolve the order customer server-side.
+* Resolve that customer's active device tokens.
+* Respect each device's captured locale.
+
+For `new_order_pool` / `order_released`:
+
+* Resolve eligible drivers server-side at dispatch time.
+* Eligibility must follow the existing driver availability/business rules.
+* Only active push tokens for currently eligible drivers are targeted.
+* The push notification MUST NOT grant ownership of the order.
+* `claim_order()` remains the authoritative mechanism for winning an order.
+
+Review whether `target_user_ids UUID[]` is actually needed. If it is not required by the approved design, remove it from the task/schema instead of storing stale recipient information.
+
+### 3. Preserve release semantics
+
+Make the release flow explicit:
+
+accepted/assigned
+→ driver releases according to the existing business rules
+→ order returns to the available pool
+→ exactly one `order_released` notification event for that release transition
+→ eligible available drivers are resolved
+→ pool push is sent.
+
+If the same order is released again later, that is a new legitimate release transition and MUST produce a new event.
+
+Do not deduplicate all releases for an order into one lifetime event.
+
+Also ensure the trigger cannot emit both duplicate lifecycle events and duplicate pool events for the same transition.
+
+### 4. Clarify trigger behavior
+
+T008 must explicitly state:
+
+* Trigger executes AFTER INSERT OR UPDATE only as required by the actual order lifecycle.
+* Status transition detection uses `OLD.status IS DISTINCT FROM NEW.status` for UPDATE.
+* INSERT + `pending` produces `new_order_pool` exactly once.
+* `active → pending` produces the appropriate release event according to the existing 003 design.
+* Trigger performs NO HTTP requests.
+* Trigger performs NO Expo API calls.
+* Trigger only persists durable notification event records.
+* Notification event insertion must be protected by database uniqueness/idempotency.
+
+Do not duplicate or reinterpret the business rules from the existing 003 implementation.
+
+### 5. Clarify Edge Function claiming
+
+Review T018.
+
+The atomic dispatch claim must be implementable using the actual Supabase/Postgres access pattern.
+
+The requirement is:
+
+* Only one concurrent invocation can transition an event from `pending` to `processing`.
+* A repeated webhook delivery must safely exit without sending another notification.
+* The claim operation must be atomic.
+* The implementation must use an appropriate server-side Supabase/Postgres mechanism rather than leaving raw pseudo-SQL that cannot be executed by the chosen client API.
+* If necessary, define a small server-side SQL/RPC helper for atomic claiming, but avoid unnecessary abstraction.
+
+Do not introduce a general queue/message-broker system.
+
+### 6. Keep webhook architecture
+
+Preserve this exact high-level pipeline:
+
+`orders transition`
+→ `Postgres trigger`
+→ `notification_events`
+→ `Supabase Database Webhook`
+→ `notify-order-status Edge Function`
+→ `Expo Push API`
+→ target device tokens
+
+The Postgres trigger MUST NOT make HTTP requests.
+
+The Database Webhook is the asynchronous boundary between the database transaction and push dispatch.
+
+### 7. Preserve RLS/security requirements
+
+Verify T006, T007, and T014.
+
+`device_push_tokens`:
+
+* RLS enabled.
+* Authenticated users can access only their own rows.
+* No cross-user INSERT/UPDATE/SELECT.
+* Anonymous access denied.
+* No client DELETE policy unless explicitly required.
+* Server-side privileged access is performed only from the Edge Function.
+* Never expose `service_role` in `src/`.
+* No webhook secret in client code.
+
+`notification_events`:
+
+* RLS enabled.
+* No normal authenticated/anonymous CRUD policies unless explicitly required.
+* Client cannot directly manipulate notification events.
+* Edge Function uses the appropriate server-side privileged access.
+
+Verify that the SQL privileges are consistent with the project's existing migration/grant discipline.
+
+### 8. Re-check T022 driver eligibility
+
+Do not hardcode a guessed schema if the existing project uses different names.
+
+Use the actual schema/contracts and preserve the existing 003 semantics.
+
+The eligibility query must ensure:
+
+* role = driver
+* driver is available
+* driver does not currently have an active delivery
+* active device push token exists
+* only eligible drivers receive pool notifications
+
+The push body must contain only the allowed order information:
+
+* pickup zone
+* formatted order total/value
+
+Never include:
+
+* customer name
+* customer phone
+* customer address
+* order items
+* other customer PII
+
+Again, notification eligibility does not grant order ownership. `claim_order()` remains authoritative.
+
+### 9. Review event type consistency
+
+The seven event types must remain exactly:
+
+* `new_order_pool`
+* `order_accepted`
+* `order_preparing`
+* `order_out_for_delivery`
+* `order_delivered`
+* `order_cancelled`
+* `order_released`
+
+Make sure these names are consistent across:
+
+* data-model.md
+* contracts
+* SQL CHECK constraints
+* TypeScript enum
+* Edge Function
+* tasks.md
+* quickstart.md
+
+### 10. Review task dependencies after the corrections
+
+After changing event identity / recipient resolution / atomic claiming, update:
+
+* individual task dependencies
+* phase dependencies
+* user story dependencies
+* parallel opportunities
+
+Do not claim tasks are parallel if they modify the same file or depend on the same schema contract.
+
+In particular:
+
+* T006/T007/T008 may remain parallel only if their actual schema dependencies allow it.
+* T018 must depend on the finalized `notification_events` schema and contracts.
+* T022 extends the same Edge Function and therefore remains sequential after T018/T019.
+* RLS verification must run after the relevant migrations are applied.
+* User story validation must use the final event semantics.
+
+### 11. Verify the tasks against the constitution
+
+Explicitly re-check:
+
+* Feature-first structure
+* Presentation → Application → Domain ← Infrastructure
+* TanStack Query for server state
+* Redux Toolkit only for cart
+* Server is final authority
+* Atomic DB writes
+* Immutable order snapshots
+* Realtime separate from Push
+* Future GPS/payment/Admin compatibility
+* Practical MVP simplicity
+
+Do not introduce unnecessary DI containers, generic event buses, message brokers, or infrastructure abstractions.
+
+### 12. Preserve existing scope
+
+Do NOT add:
+
+* driver GPS tracking
+* online/card payments
+* admin dashboard
+* generic notification center
+* read/unread notification system
+* server-side retry queues
+* arbitrary background workers
+* unnecessary analytics
+* TDD test suites if the spec explicitly chose manual validation
+
+Keep:
+
+* Android-first EAS development build
+* Expo Notifications v57
+* Supabase Database Webhook
+* Supabase Edge Function
+* Expo Push API
+* Arabic + English
+* multi-device support
+* cancellation notification
+* released-order notification
+* foreground suppression
+* deep linking
+* offline registration/deactivation queue
+* manual quickstart validation
+
+### 13. Final output requirements
+
+Update `/specs/004-push-notifications/tasks.md` directly.
+
+If the corrections require changes to `data-model.md` or `contracts/`, update those documents too.
+
+Do NOT create implementation code.
+
+Do NOT create a new feature branch.
+
+Do NOT create another tasks file.
+
+At the end, provide a concise summary containing:
+
+1. Files changed
+2. How event idempotency now works
+3. How repeated `released` transitions are handled
+4. How driver recipients are resolved
+5. How atomic Edge Function claiming works
+6. RLS/security changes
+7. Updated task dependency changes
+8. Constitution compliance result
+
+Important: The final tasks.md must remain implementation-ready. Every task must still contain an exact file/path or explicit infrastructure location where applicable.
+

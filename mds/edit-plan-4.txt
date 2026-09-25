@@ -1,0 +1,240 @@
+Review the current implementation plan at:
+
+`/specs/004-push-notifications/plan.md`
+
+Do NOT rewrite the feature from scratch. Keep the existing architecture, constitution alignment, scope, and decisions unless they directly conflict with the improvements below.
+
+Update the plan to incorporate these four engineering improvements:
+
+### 1. Clarify the server-side notification pipeline
+
+The current plan says:
+
+> Postgres trigger-fired Supabase Edge Functions
+
+Refine this architecture so that the recommended flow is:
+
+```text
+Order state change
+    ↓
+Postgres trigger
+    ↓
+INSERT into notification_events
+    ↓
+Supabase Database Webhook
+    ↓
+Supabase Edge Function
+    ↓
+Expo Push API
+    ↓
+Target devices
+```
+
+The Postgres trigger should NOT perform an external HTTP request directly as part of the order transaction.
+
+The trigger's responsibility should be limited to creating the durable notification event / enqueue record.
+
+The Database Webhook should invoke the Edge Function asynchronously/outside the order transaction.
+
+Update all relevant sections of `plan.md`, including:
+
+* Summary
+* Technical Context
+* Project Structure if necessary
+* Constitution Check
+* Any architecture descriptions
+* Complexity Tracking if necessary
+
+Keep the design compatible with the existing Sari3 architecture.
+
+### 2. Add idempotency / duplicate-notification protection
+
+The current plan uses an append-only `notification_events` table but does not explicitly define duplicate protection.
+
+Add a clear idempotency strategy.
+
+Requirements:
+
+* A single logical order lifecycle event must have a stable identity.
+* Repeated webhook/function invocation must NOT create duplicate logical notification events.
+* The Edge Function must be safe to invoke more than once.
+* The database should enforce the uniqueness invariant rather than relying only on application code.
+
+For example, consider a uniqueness model based on:
+
+```text
+order_id + event_type
+```
+
+when each lifecycle event is allowed only once per order.
+
+However, do NOT blindly assume this is correct for every event. Verify the semantics of:
+
+* accepted
+* preparing
+* out_for_delivery
+* delivered
+* cancelled
+* released
+
+Especially verify that `released` can legitimately happen more than once during an order's lifecycle. If it can, use an appropriate event identity such as a release-transition UUID / transition ID rather than incorrectly enforcing `UNIQUE(order_id, event_type)`.
+
+Document the chosen strategy in `data-model.md` and/or the relevant contract section if those files are part of the current planning phase.
+
+The final design must guarantee that retries/repeated webhook delivery do not result in duplicate push sends where the same logical event has already been processed.
+
+### 3. Make security / RLS boundaries explicit
+
+Add explicit security requirements for:
+
+`device_push_tokens`
+
+and
+
+`notification_events`
+
+Requirements:
+
+#### device_push_tokens
+
+* RLS MUST be enabled.
+* A signed-in user can register/manage only their own device tokens.
+* A user must not be able to insert/update/delete another user's token.
+* The client must never receive privileged credentials.
+* Service-side notification dispatch may access eligible tokens using the appropriate server-side privileged mechanism.
+* Never expose `service_role` or equivalent secret keys in the React Native client.
+
+Define the expected policies and ownership predicate clearly.
+
+#### notification_events
+
+Decide whether this table actually needs client access.
+
+Prefer no direct client access if the mobile application does not need to read the event log.
+
+If client access is unnecessary:
+
+* Enable RLS.
+* Do not expose normal SELECT/INSERT/UPDATE/DELETE access to authenticated users.
+* Allow the server-side notification pipeline to write/read it using the appropriate privileged mechanism.
+
+Also explicitly document the privilege boundary between:
+
+* React Native client
+* Postgres
+* Database Webhook
+* Edge Function
+* Expo Push API
+
+Do not weaken RLS merely to make the Edge Function work.
+
+### 4. Define driver eligibility and release semantics precisely
+
+Make the driver notification targeting rules explicit.
+
+For a new unclaimed order, an eligible driver should satisfy the existing Sari3 business rules, such as:
+
+```text
+driver is active
+AND driver is available
+AND driver has no active delivery
+AND driver has an active push token
+```
+
+Do not invent column names if the existing schema uses different names. Reference the actual existing 003 driver/order model where possible.
+
+Clarify that push notification delivery does NOT grant ownership of the order.
+
+The authoritative operation remains:
+
+```text
+claim_order()
+```
+
+The database decides whether the driver successfully claims the order.
+
+Also explicitly define the release flow:
+
+```text
+Driver accepts order
+    ↓
+Order assigned to driver
+    ↓
+Driver releases/rejects according to existing business rules
+    ↓
+Order returns to the available/unclaimed pool
+    ↓
+A new `order_released` notification event is generated
+    ↓
+Eligible available drivers are notified again
+```
+
+Prevent accidental notification loops.
+
+The `order_released` event must represent a real transition back into the available order pool.
+
+If an order can be released multiple times, the event identity/idempotency mechanism must support multiple legitimate release events while still preventing duplicate processing of the same release transition.
+
+Do NOT modify the existing `claim_order()` / `release_order()` business semantics unless the current plan or existing specs require it.
+
+### Important consistency requirements
+
+After making these changes:
+
+1. Re-check the Constitution Check.
+2. Ensure Principle V (Server Is Final Authority) remains PASS.
+3. Ensure Principle VI (Atomic Writes) remains PASS.
+4. Ensure Principle VIII (Realtime vs Push Separation) remains PASS.
+5. Ensure Principle X (Practical MVP Simplicity) remains PASS.
+6. Do not introduce a DI container, message broker, queueing infrastructure, or unnecessary abstractions.
+7. Keep the MVP simple.
+8. Do not add SMS/email/etc. to this feature.
+9. Keep Android-first EAS development-build validation unchanged.
+10. Keep the existing bilingual Arabic/English requirement.
+11. Keep cancellation notifications.
+12. Keep released-order notifications.
+13. Keep multi-device support.
+
+### Supabase-specific verification
+
+Before finalizing the updated plan, verify the proposed Supabase architecture against the current Supabase documentation, especially:
+
+* Database Webhooks
+* Edge Functions
+* Expo Push Notifications
+* RLS/security
+* Edge Function access to Postgres
+
+Do not rely on outdated Supabase behavior.
+
+### Output requirements
+
+Update the relevant planning artifacts instead of merely describing what should change.
+
+At minimum, update:
+
+`/specs/004-push-notifications/plan.md`
+
+If the changes require details in:
+
+`/specs/004-push-notifications/data-model.md`
+
+or
+
+`/specs/004-push-notifications/contracts/`
+
+update those consistently as well.
+
+Do NOT create `tasks.md`; that belongs to `/speckit-tasks`.
+
+At the end, provide a concise summary of:
+
+* Files changed
+* Architecture changes
+* Idempotency strategy
+* RLS/security changes
+* Driver eligibility/release semantics
+* Constitution re-check result
+
+Do not implement application code yet. This task is for updating the implementation plan/design artifacts only.
+
