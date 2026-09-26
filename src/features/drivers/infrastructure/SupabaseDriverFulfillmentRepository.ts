@@ -9,6 +9,7 @@ import {
 } from '../../orders/domain/entities/Order';
 import { OrderStatus } from '../../orders/domain/entities/OrderStatus';
 import {
+  AdvanceOrderResult,
   ClaimOrderResult,
   DriverFulfillmentRepository,
 } from '../domain/repositories/DriverFulfillmentRepository';
@@ -74,6 +75,7 @@ interface OrderRow {
   accepted_at: string | null;
   delivered_at: string | null;
   updated_at: string | null;
+  customer_hidden_at?: string | null;
 }
 
 function mapOrder(row: OrderRow, items: OrderItemSnapshot[]): Order {
@@ -97,6 +99,7 @@ function mapOrder(row: OrderRow, items: OrderItemSnapshot[]): Order {
     acceptedAt: row.accepted_at,
     deliveredAt: row.delivered_at,
     updatedAt: row.updated_at ?? '',
+    customerHiddenAt: row.customer_hidden_at ?? null,
   };
 }
 
@@ -193,12 +196,23 @@ export class SupabaseDriverFulfillmentRepository
     if (error) throw new Error(error.message);
   }
 
-  async advanceOrderStatus(orderId: string): Promise<string> {
+  async advanceOrderStatus(orderId: string): Promise<AdvanceOrderResult> {
     const { data, error } = await supabase.rpc('advance_order_status', {
       p_order_id: orderId,
     });
     if (error) throw new Error(error.message);
-    return String((data as { new_status?: string })?.new_status ?? '');
+    const payload = data as {
+      success?: boolean;
+      new_status?: string;
+      error?: string;
+      message?: string;
+    };
+    return {
+      success: Boolean(payload?.success),
+      newStatus: payload?.new_status,
+      error: payload?.error,
+      message: payload?.message,
+    };
   }
 
   async releaseOrder(orderId: string, reason: string): Promise<void> {

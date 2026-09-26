@@ -82,6 +82,7 @@ interface OrderRow {
   accepted_at: string | null;
   delivered_at: string | null;
   updated_at: string | null;
+  customer_hidden_at?: string | null;
 }
 
 function mapOrder(row: OrderRow, items: OrderItemSnapshot[]): Order {
@@ -105,6 +106,7 @@ function mapOrder(row: OrderRow, items: OrderItemSnapshot[]): Order {
     acceptedAt: row.accepted_at,
     deliveredAt: row.delivered_at,
     updatedAt: row.updated_at ?? '',
+    customerHiddenAt: row.customer_hidden_at ?? null,
   };
 }
 
@@ -181,6 +183,8 @@ export class SupabaseOrderRepository implements OrderRepository {
       acceptedAt: payload.acceptedAt,
       deliveredAt: payload.deliveredAt,
       updatedAt: payload.updatedAt,
+      // place_order creates fresh, visible orders
+      customerHiddenAt: null,
     };
   }
 
@@ -209,6 +213,7 @@ export class SupabaseOrderRepository implements OrderRepository {
       .from('orders')
       .select('*')
       .eq('customer_id', customerId)
+      .is('customer_hidden_at', null)
       .order('created_at', { ascending: false });
     if (ordersError) throw new Error(ordersError.message);
 
@@ -233,5 +238,16 @@ export class SupabaseOrderRepository implements OrderRepository {
     }
 
     return rows.map((row) => mapOrder(row, itemsByOrder.get(row.id) ?? []));
+  }
+
+  async cancelOrder(orderId: string): Promise<Order> {
+    const { error } = await supabase.rpc('cancel_order', { p_order_id: orderId });
+    if (error) throw new Error(error.message);
+    return this.getOrderById(orderId);
+  }
+
+  async hideOrder(orderId: string): Promise<void> {
+    const { error } = await supabase.rpc('hide_order', { p_order_id: orderId });
+    if (error) throw new Error(error.message);
   }
 }

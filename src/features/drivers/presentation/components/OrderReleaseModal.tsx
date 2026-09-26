@@ -1,6 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
@@ -32,8 +35,26 @@ export function OrderReleaseModal({
   onClose,
 }: OrderReleaseModalProps) {
   const [reason, setReason] = useState('');
+  const [keyboardPadding, setKeyboardPadding] = useState(0);
   const trimmed = reason.trim();
   const valid = trimmed !== '';
+
+  // Android Modals create their own window and do not inherit the app's
+  // adjustResize behaviour, so the keyboard would cover the input. Track the
+  // keyboard height and pad the sheet manually; iOS uses KeyboardAvoidingView.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const showListener = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardPadding(e.endCoordinates.height);
+    });
+    const hideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardPadding(0);
+    });
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+    };
+  }, []);
 
   return (
     <Modal
@@ -42,8 +63,11 @@ export function OrderReleaseModal({
       transparent
       onRequestClose={onClose}
     >
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={[styles.sheet, { paddingBottom: spacing.lg + keyboardPadding }]}>
           <Text style={styles.title}>Release this order?</Text>
           <Text style={styles.description}>
             The order will return to the available pool for other drivers.
@@ -74,13 +98,13 @@ export function OrderReleaseModal({
             disabled={!valid || isSubmitting}
           />
           <Button
-            title="Cancel"
+            title="Keep"
             variant="outline"
             onPress={onClose}
             disabled={isSubmitting}
           />
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

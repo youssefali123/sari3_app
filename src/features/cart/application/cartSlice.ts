@@ -8,6 +8,12 @@ interface AddItemPayload {
   storeName: string;
 }
 
+interface BatchPayload {
+  storeId: string;
+  storeName: string;
+  items: CartItem[];
+}
+
 interface CartState {
   storeId: string | null;
   storeName: string | null;
@@ -16,6 +22,8 @@ interface CartState {
   conflictState: {
     isOpen: boolean;
     pendingItem: AddItemPayload | null;
+    // Order Again batch reorder (feature 005): pending multi-item replacement.
+    pendingBatch: BatchPayload | null;
   };
 }
 
@@ -26,6 +34,7 @@ const initialState: CartState = {
   conflictState: {
     isOpen: false,
     pendingItem: null,
+    pendingBatch: null,
   },
 };
 
@@ -108,11 +117,45 @@ export const cartSlice = createSlice({
       state.conflictState = {
         isOpen: true,
         pendingItem: action.payload,
+        pendingBatch: null,
       };
     },
 
     /** Closes the conflict prompt without changing cart contents. */
     dismissConflict(state) {
+      state.conflictState = initialState.conflictState;
+    },
+
+    /**
+     * Order Again (feature 005): atomically clears the cart and stages a
+     * batch of revalidated items from a past order. Assumes the single-store
+     * conflict check has already been resolved by the caller.
+     */
+    clearAndSetBatch(state, action: PayloadAction<BatchPayload>) {
+      const { storeId, storeName, items } = action.payload;
+      state.storeId = storeId;
+      state.storeName = storeName;
+      state.items = items;
+      state.conflictState = initialState.conflictState;
+    },
+
+    /** Opens the conflict prompt for an Order Again batch from another store. */
+    setConflictBatchPrompt(state, action: PayloadAction<BatchPayload>) {
+      state.conflictState = {
+        isOpen: true,
+        pendingItem: null,
+        pendingBatch: action.payload,
+      };
+    },
+
+    /** Conflict confirm path for a pending Order Again batch. */
+    confirmBatchReplace(state) {
+      const batch = state.conflictState.pendingBatch;
+      if (batch) {
+        state.storeId = batch.storeId;
+        state.storeName = batch.storeName;
+        state.items = batch.items;
+      }
       state.conflictState = initialState.conflictState;
     },
   },
@@ -126,6 +169,9 @@ export const {
   clearAndAddItem,
   setConflictPrompt,
   dismissConflict,
+  clearAndSetBatch,
+  setConflictBatchPrompt,
+  confirmBatchReplace,
 } = cartSlice.actions;
 
 // Selectors

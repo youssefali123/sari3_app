@@ -166,6 +166,7 @@ export interface OrdersRow {
   accepted_at: string | null;
   delivered_at: string | null;
   updated_at: string;
+  customer_hidden_at: string | null;
 }
 
 export interface OrderItemsRow {
@@ -222,6 +223,9 @@ export interface Database {
       };
       get_order_driver_info: { Args: { p_order_id: string }; Returns: Json };
       claim_order: { Args: { p_order_id: string; p_driver_id: string }; Returns: Json };
+      cancel_order: { Args: { p_order_id: string }; Returns: Json };
+      hide_order: { Args: { p_order_id: string }; Returns: Json };
+      expire_stale_orders: { Args: Record<string, never>; Returns: Json };
     };
   };
 }

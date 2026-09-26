@@ -19,6 +19,10 @@ interface ActiveOrderCardProps {
   onAdvance: () => void;
   isAdvancing: boolean;
   error?: Error | null;
+  /** Shown when the customer cancelled this order (feature 005 US3). */
+  customerCancelled?: boolean;
+  /** Recovery action after a customer cancellation. */
+  onReturnToPool?: () => void;
 }
 
 /**
@@ -32,11 +36,27 @@ export function ActiveOrderCard({
   onAdvance,
   isAdvancing,
   error,
+  customerCancelled,
+  onReturnToPool,
 }: ActiveOrderCardProps) {
   return (
     <View style={styles.card}>
       <Text style={styles.storeName}>{order.storeName}</Text>
       <Text style={styles.status}>Status: {order.status.replace(/_/g, ' ')}</Text>
+
+      {customerCancelled ? (
+        <View style={styles.cancelledNotice}>
+          <Text style={styles.cancelledTitle}>Customer cancelled this order</Text>
+          <Text style={styles.cancelledBody}>
+            The customer cancelled the delivery. You can no longer progress it.
+          </Text>
+          {onReturnToPool ? (
+            <TouchableOpacity style={styles.recoveryButton} onPress={onReturnToPool} activeOpacity={0.8}>
+              <Text style={styles.recoveryText}>Return to Available Orders</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+      ) : null}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Deliver to</Text>
@@ -66,9 +86,9 @@ export function ActiveOrderCard({
         <Text style={styles.paymentNote}>Cash on delivery</Text>
       </View>
 
-      {error ? <Text style={styles.errorText}>{error.message}</Text> : null}
+      {error && !customerCancelled ? <Text style={styles.errorText}>{error.message}</Text> : null}
 
-      {nextStepLabel ? (
+      {nextStepLabel && !customerCancelled ? (
         <TouchableOpacity
           style={[styles.advanceButton, isAdvancing && styles.buttonDisabled]}
           onPress={onAdvance}
@@ -98,6 +118,34 @@ const styles = StyleSheet.create({
   storeName: {
     ...typography.h2,
     color: colors.textPrimary,
+  },
+  cancelledNotice: {
+    backgroundColor: colors.errorLight,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  cancelledTitle: {
+    ...typography.body,
+    color: colors.error,
+    fontWeight: '700',
+  },
+  cancelledBody: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+  },
+  recoveryButton: {
+    marginTop: spacing.xs,
+    alignSelf: 'flex-start',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.sm,
+    backgroundColor: colors.primary,
+  },
+  recoveryText: {
+    ...typography.bodySmall,
+    color: colors.white,
+    fontWeight: '600',
   },
   status: {
     ...typography.bodySmall,

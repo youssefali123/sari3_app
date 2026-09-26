@@ -1,4 +1,6 @@
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
+import { AppState } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ClaimOrderResult, DriverFulfillmentRepository } from '../../domain/repositories/DriverFulfillmentRepository';
 import { SupabaseDriverFulfillmentRepository } from '../../infrastructure/SupabaseDriverFulfillmentRepository';
@@ -7,7 +9,10 @@ import { DriverRealtimeService } from '../../domain/services/DriverRealtimeServi
 import { AvailableOrderPreview } from '../../domain/entities/AvailableOrderPreview';
 import { useNetworkStatus } from './useNetworkStatus';
 import { OFFLINE_ABORT_MESSAGE } from './useDriverAvailability';
-import { ACTIVE_ORDER_QUERY_KEY } from './useActiveOrder';
+import {
+  ACTIVE_ORDER_QUERY_KEY,
+  CANCELLED_NOTICE_QUERY_KEY,
+} from './useActiveOrder';
 
 const driverFulfillmentRepository: DriverFulfillmentRepository =
   new SupabaseDriverFulfillmentRepository();
@@ -38,6 +43,24 @@ export function useAvailableOrders() {
     });
   }, [queryClient]);
 
+  // Realtime sockets drop while the app is backgrounded and postgres_changes
+  // does not replay missed signals. Refetch on foreground — this is what
+  // makes a notification tap show the fresh pool — and on every screen focus.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        queryClient.invalidateQueries({ queryKey: AVAILABLE_ORDERS_QUERY_KEY });
+      }
+    });
+    return () => sub.remove();
+  }, [queryClient]);
+
+  useFocusEffect(
+    useCallback(() => {
+      queryClient.invalidateQueries({ queryKey: AVAILABLE_ORDERS_QUERY_KEY });
+    }, [queryClient]),
+  );
+
   const claimMutation = useMutation({
     mutationFn: async (orderId: string): Promise<ClaimOrderResult> => {
       if (!isConnected) {
@@ -51,6 +74,8 @@ export function useAvailableOrders() {
         queryClient.invalidateQueries({
           queryKey: AVAILABLE_ORDERS_QUERY_KEY,
         });
+        // A new claim retires any "customer cancelled" notice.
+        queryClient.setQueryData(CANCELLED_NOTICE_QUERY_KEY, null);
       } else {
         // Lost the race: drop the order from the cached pool immediately.
         queryClient.setQueryData<AvailableOrderPreview[]>(

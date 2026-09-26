@@ -7,6 +7,19 @@ export interface ClaimOrderResult {
   order: Order | null;
 }
 
+/**
+ * Structured result of a status-advance attempt. `success: false` carries an
+ * error code (e.g. ORDER_STATUS_CHANGED when the customer cancelled
+ * concurrently) instead of throwing — the driver UI resolves it gracefully
+ * (feature 005 US7).
+ */
+export interface AdvanceOrderResult {
+  success: boolean;
+  newStatus?: string;
+  error?: string;
+  message?: string;
+}
+
 export interface DriverFulfillmentRepository {
   /**
    * Toggle driver availability between Available (true) and Offline (false).
@@ -42,9 +55,11 @@ export interface DriverFulfillmentRepository {
 
   /**
    * Advance the driver's active order to the next sequential lifecycle state:
-   * accepted -> preparing -> out_for_delivery -> delivered.
+   * accepted -> preparing -> out_for_delivery -> delivered. Returns a
+   * structured result; concurrent customer cancellations produce
+   * success: false with error ORDER_STATUS_CHANGED instead of throwing.
    */
-  advanceOrderStatus(orderId: string): Promise<string>;
+  advanceOrderStatus(orderId: string): Promise<AdvanceOrderResult>;
 
   /**
    * Self-report inability to complete the active order with a mandatory

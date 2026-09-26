@@ -132,9 +132,18 @@ src/
 │   │   └── presentation
 │   │       └── FavoriteButton.tsx
 │   ├── notifications
-│   │   └── domain
-│   │       └── services
-│   │           └── NotificationService.ts
+│   │   ├── application
+│   │   │   └── hooks
+│   │   │       ├── useNotificationPermission.ts
+│   │   │       └── useNotificationSetup.ts
+│   │   ├── domain
+│   │   │   ├── entities
+│   │   │   │   ├── DevicePushRegistration.ts
+│   │   │   │   └── NotificationEventType.ts
+│   │   │   └── services
+│   │   │       └── NotificationService.ts
+│   │   └── infrastructure
+│   │       └── ExpoNotificationService.ts
 │   ├── orders
 │   │   ├── domain
 │   │   │   ├── entities
@@ -230,4 +239,3 @@ src/
         ├── formatting.ts
         └── validation.ts
 ```
-

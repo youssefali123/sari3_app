@@ -1,5 +1,14 @@
-import React, { useState } from 'react';
-import { FlatList, Modal, StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import {
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
 import { SavedDeliveryAddress } from '../domain/entities/SavedDeliveryAddress';
 import { AddressCard } from './AddressCard';
 import { Button } from '@/shared/ui/components/Button';
@@ -33,6 +42,23 @@ export function AddressSelectionModal({
   onClose,
   onAddNew,
 }: AddressSelectionModalProps) {
+  const [keyboardPadding, setKeyboardPadding] = useState(0);
+  // Android Modals do not inherit adjustResize — pad the sheet by the
+  // keyboard height so inputs stay visible (same fix as OrderReleaseModal).
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const showListener = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardPadding(e.endCoordinates.height);
+    });
+    const hideListener = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardPadding(0);
+    });
+    return () => {
+      showListener.remove();
+      hideListener.remove();
+    };
+  }, []);
+
   const [showForm, setShowForm] = useState(false);
   const [label, setLabel] = useState('');
   const [addressText, setAddressText] = useState('');
@@ -60,8 +86,11 @@ export function AddressSelectionModal({
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+      <KeyboardAvoidingView
+        style={styles.backdrop}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      >
+        <View style={[styles.sheet, { paddingBottom: spacing.lg + keyboardPadding }]}>
           <Text style={styles.title}>Select delivery address</Text>
 
           {showForm ? (
@@ -124,7 +153,7 @@ export function AddressSelectionModal({
             </View>
           ) : null}
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

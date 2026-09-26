@@ -1,43 +1,75 @@
 import React from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
-import { selectCartConflict } from '../application/cartSlice';
+import { useRouter } from 'expo-router';
+import {
+  selectCartConflict,
+  confirmBatchReplace,
+  dismissConflict,
+} from '../application/cartSlice';
 import { useAddToCart } from '../application/useAddToCart';
-import { useAppSelector } from '@/shared/lib/store';
+import { useAppDispatch, useAppSelector } from '@/shared/lib/store';
 import { colors } from '@/shared/ui/theme/colors';
 import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
 import { typography } from '@/shared/ui/theme/typography';
 import { Button } from '@/shared/ui/components/Button';
 
 /**
- * Confirmation prompt when adding an item from a different store than the
- * current cart contents. No silent replacement (BR-002, BR-010, SC-003).
+ * Confirmation prompt when adding an item — or an "Order Again" batch — from
+ * a different store than the current cart contents. No silent replacement
+ * (BR-002, BR-010, SC-003).
  */
 export function StoreConflictModal() {
   const conflict = useAppSelector(selectCartConflict);
+  const dispatch = useAppDispatch();
+  const router = useRouter();
   const { confirmConflictResolution, declineConflictResolution } = useAddToCart();
 
   const pending = conflict.pendingItem;
+  const pendingBatch = conflict.pendingBatch;
+  const isBatch = Boolean(pendingBatch);
+
+  const handleConfirm = () => {
+    if (pendingBatch) {
+      dispatch(confirmBatchReplace());
+      // Order Again hand-off: standard checkout for explicit confirmation.
+      router.push('/(customer)/checkout');
+    } else {
+      confirmConflictResolution();
+    }
+  };
+
+  const handleDecline = () => {
+    if (pendingBatch) {
+      dispatch(dismissConflict());
+    } else {
+      declineConflictResolution();
+    }
+  };
+
+  const incomingStore = pendingBatch?.storeName ?? pending?.storeName;
 
   return (
-    <Modal visible={conflict.isOpen} transparent animationType="fade" onRequestClose={declineConflictResolution}>
+    <Modal visible={conflict.isOpen} transparent animationType="fade" onRequestClose={handleDecline}>
       <View style={styles.backdrop}>
         <View style={styles.dialog}>
           <Text style={styles.title}>Replace cart items?</Text>
           <Text style={styles.message}>
-            {pending
-              ? `Your cart contains items from another store. Replace them with an item from ${pending.storeName}?`
+            {incomingStore
+              ? `Your cart contains items from another store. Replace them with ${
+                  isBatch ? 'items' : 'an item'
+                } from ${incomingStore}?`
               : 'Your cart contains items from another store. Replace them?'}
           </Text>
           <View style={styles.buttons}>
             <Button
               title="Keep current cart"
               variant="outline"
-              onPress={declineConflictResolution}
+              onPress={handleDecline}
               style={styles.button}
             />
             <Button
               title="Replace cart"
-              onPress={confirmConflictResolution}
+              onPress={handleConfirm}
               style={styles.button}
             />
           </View>

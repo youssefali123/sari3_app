@@ -10,4 +10,6 @@ export enum NotificationEventType {
   OrderDelivered = 'order_delivered',
   OrderCancelled = 'order_cancelled',
   OrderReleased = 'order_released',
+  OrderCancelledByCustomer = 'order_cancelled_by_customer',
+  OrderExpired = 'order_expired',
 }

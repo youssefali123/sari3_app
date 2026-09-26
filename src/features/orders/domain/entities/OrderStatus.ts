@@ -9,22 +9,26 @@ export enum OrderStatus {
   Delivered = 'delivered',
   Cancelled = 'cancelled',
   Rejected = 'rejected',
+  Expired = 'expired',
 }
 
 /**
  * Valid status transitions. Used for client-side validation.
  * Must match the validate_order_transition trigger exactly:
- * 'cancelled' is reachable only from 'pending' (customer cancel);
- * an accepted order can only advance forward to 'delivered'.
+ * - 'cancelled' is reachable from 'pending', 'accepted', 'preparing', and
+ *   'out_for_delivery' (customer self-service cancellation via cancel_order);
+ * - 'expired' is reachable only from 'pending' (server-side expiration job);
+ * - 'rejected' remains reserved (no write path yet).
  */
 const VALID_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  [OrderStatus.Pending]: [OrderStatus.Accepted, OrderStatus.Cancelled, OrderStatus.Rejected],
-  [OrderStatus.Accepted]: [OrderStatus.Preparing],
-  [OrderStatus.Preparing]: [OrderStatus.OutForDelivery],
-  [OrderStatus.OutForDelivery]: [OrderStatus.Delivered],
+  [OrderStatus.Pending]: [OrderStatus.Accepted, OrderStatus.Cancelled, OrderStatus.Rejected, OrderStatus.Expired],
+  [OrderStatus.Accepted]: [OrderStatus.Preparing, OrderStatus.Cancelled],
+  [OrderStatus.Preparing]: [OrderStatus.OutForDelivery, OrderStatus.Cancelled],
+  [OrderStatus.OutForDelivery]: [OrderStatus.Delivered, OrderStatus.Cancelled],
   [OrderStatus.Delivered]: [],
   [OrderStatus.Cancelled]: [],
   [OrderStatus.Rejected]: [],
+  [OrderStatus.Expired]: [],
 };
 
 /**

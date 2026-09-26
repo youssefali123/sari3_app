@@ -75,6 +75,20 @@ function customerCopy(
             title: 'Finding a new driver',
             body: `Your driver released your order from ${storeName} — we're finding a new one`,
           };
+    case 'order_cancelled_by_customer':
+      return ar
+        ? { title: 'تم إلغاء الطلب', body: `قام العميل بإلغاء طلبك من ${storeName}` }
+        : {
+            title: 'Order cancelled',
+            body: `The customer cancelled your order from ${storeName}`,
+          };
+    case 'order_expired':
+      return ar
+        ? { title: 'انتهت صلاحية الطلب', body: `انتهت صلاحية طلبك من ${storeName} لعدم توفر سائق` }
+        : {
+            title: 'Order expired',
+            body: `Your order from ${storeName} expired as no driver was available`,
+          };
     default:
       return ar
         ? { title: 'تحديث الطلب', body: `تحديث بخصوص طلبك من ${storeName}` }
@@ -157,7 +171,7 @@ Deno.serve(async (req: Request) => {
     // ---- 3. Order context, resolved server-side (never trust the payload) -
     const { data: order, error: orderError } = await admin
       .from('orders')
-      .select('id, customer_id, restaurant_id, restaurant_name, total_amount')
+      .select('id, customer_id, driver_id, restaurant_id, restaurant_name, total_amount')
       .eq('id', event.order_id)
       .single();
     if (orderError || !order) throw new Error('order not found: ' + (orderError?.message ?? ''));
@@ -169,7 +183,36 @@ Deno.serve(async (req: Request) => {
 
     const messages: PushMessage[] = [];
 
-    if (event.target_role === 'customer') {
+    if (event.event_type === 'order_cancelled_by_customer') {
+      // Targeted driver event: only the assigned driver's active tokens
+      if (!order.driver_id) {
+        await admin
+          .from('notification_events')
+          .update({ dispatch_status: 'sent', expo_receipts: { note: 'no_assigned_driver' } })
+          .eq('id', event.id);
+        return new Response(
+          JSON.stringify({ success: true, event_id: event.id, dispatched_count: 0, reason: 'no_assigned_driver' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+      const { data: tokens, error: tokenError } = await admin
+        .from('device_push_tokens')
+        .select('push_token, locale')
+        .eq('user_id', order.driver_id)
+        .eq('is_active', true);
+      if (tokenError) throw new Error(tokenError.message);
+      for (const t of (tokens ?? []) as DeviceTokenRow[]) {
+        const copy = customerCopy(event.event_type, order.restaurant_name, t.locale);
+        messages.push({
+          to: t.push_token,
+          title: copy.title,
+          body: copy.body, // PII-free: no customer name/phone/address
+          data: { url: '/(driver)/available-orders', event_type: event.event_type, order_id: order.id },
+          sound: 'default',
+          channelId: 'order-updates',
+        });
+      }
+    } else if (event.target_role === 'customer') {
       // ---- 4a. Customer recipients: all active tokens, per-token locale ----
       const { data: tokens, error: tokenError } = await admin
         .from('device_push_tokens')
