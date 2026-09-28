@@ -33,6 +33,7 @@ export interface ProfilesRow {
   full_name: string | null;
   phone: string | null;
   avatar_url: string | null;
+  selected_area_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -47,6 +48,7 @@ export interface RestaurantsRow {
   is_open: boolean;
   category: string | null;
   type: StoreType;
+  area_id: string;
   created_at: string;
 }
 
@@ -174,6 +176,8 @@ export interface OrderItemsRow {
   order_id: string;
   product_id: string;
   product_name: string;
+  variant_id: string | null;
+  variant_name: string | null;
   quantity: number;
   unit_price: number;
   addon_snapshots: Json;
@@ -191,9 +195,34 @@ export interface DriverProfilesRow {
   updated_at: string;
 }
 
+export interface AreasRow {
+  id: string;
+  name: string;
+  parent_area_id: string | null;
+  created_at: string;
+}
+
+export interface DriverAreasRow {
+  driver_id: string;
+  area_id: string;
+  created_at: string;
+}
+
+export interface ProductVariantsRow {
+  id: string;
+  product_id: string;
+  name: string;
+  price: number;
+  is_available: boolean;
+  display_order: number;
+}
+
 export interface Database {
   public: {
     Tables: {
+      product_variants: { Row: ProductVariantsRow };
+      areas: { Row: AreasRow };
+      driver_areas: { Row: DriverAreasRow };
       profiles: { Row: ProfilesRow };
       restaurants: { Row: RestaurantsRow };
       store_categories: { Row: StoreCategoriesRow };

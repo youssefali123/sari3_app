@@ -177,7 +177,7 @@ Deno.serve(async (req: Request) => {
     if (orderError || !order) throw new Error('order not found: ' + (orderError?.message ?? ''));
     const { data: restaurant } = await admin
       .from('restaurants')
-      .select('address')
+      .select('address, area_id')
       .eq('id', order.restaurant_id)
       .maybeSingle();
 
@@ -232,15 +232,42 @@ Deno.serve(async (req: Request) => {
         });
       }
     } else {
-      // ---- 4b. Pool event: eligible drivers, mirroring get_available_orders -
+      // ---- 4b. Pool event: eligible drivers, mirroring get_available_orders,
+      // regionally scoped to the order's restaurant area (feature 006 FR-026).
       // Resolved in sequential queries (supabase-js .in() takes arrays,
-      // not nested builders): driver role → Available → minus busy → tokens.
-      const { data: driverIds, error: roleErr } = await admin
-        .from('profiles')
-        .select('id')
-        .eq('role', 'driver');
-      if (roleErr) throw new Error(roleErr.message);
-      const roleIds = (driverIds ?? []).map((r) => r.id);
+      // not nested builders): assigned-to-area → driver role → Available →
+      // minus busy → tokens.
+
+      // Regional scope: the restaurant's area; no area = no broadcast.
+      const areaId = restaurant?.area_id;
+      if (!areaId) {
+        await admin
+          .from('notification_events')
+          .update({ dispatch_status: 'sent', expo_receipts: { note: 'no_area_assigned' } })
+          .eq('id', event.id);
+        return new Response(
+          JSON.stringify({ success: true, event_id: event.id, dispatched_count: 0, reason: 'no_area_assigned' }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      const { data: areaDrivers, error: areaErr } = await admin
+        .from('driver_areas')
+        .select('driver_id')
+        .eq('area_id', areaId);
+      if (areaErr) throw new Error(areaErr.message);
+      const assignedDriverIds = (areaDrivers ?? []).map((r) => r.driver_id);
+
+      let roleIds: string[] = [];
+      if (assignedDriverIds.length > 0) {
+        const { data: driverIds, error: roleErr } = await admin
+          .from('profiles')
+          .select('id')
+          .eq('role', 'driver')
+          .in('id', assignedDriverIds);
+        if (roleErr) throw new Error(roleErr.message);
+        roleIds = (driverIds ?? []).map((r) => r.id);
+      }
 
       let availIds: string[] = [];
       if (roleIds.length > 0) {

@@ -3,6 +3,7 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'rea
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useDriverAvailability } from '@/features/drivers/application/hooks/useDriverAvailability';
+import { useDriverAreas } from '@/features/drivers/application/hooks/useDriverAreas';
 import { AvailabilityToggle } from '@/features/drivers/presentation/components/AvailabilityToggle';
 import { colors } from '@/shared/ui/theme/colors';
 import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
@@ -16,6 +17,8 @@ export default function DriverProfileScreen() {
   const router = useRouter();
   const { profile, signOut } = useAuth();
   const { isAvailable } = useDriverAvailability();
+  const { areaNames, hasAssignedAreas, isLoading: areasLoading } = useDriverAreas();
+  const workAreaLabel = hasAssignedAreas ? areaNames.join(', ') : 'No areas assigned';
 
   async function handleSignOut() {
     try {
@@ -39,6 +42,9 @@ export default function DriverProfileScreen() {
           <Text style={isAvailable ? styles.available : styles.offline}>
             {isAvailable ? 'Available' : 'Offline'}
           </Text>
+        </Text>
+        <Text style={styles.workArea}>
+          {areasLoading ? 'Loading work areas…' : `Work area: ${workAreaLabel}`}
         </Text>
       </View>
 
@@ -86,6 +92,13 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     padding: spacing.md,
     paddingTop: spacing.xs,
+  },
+  workArea: {
+    ...typography.bodySmall,
+    color: colors.textSecondary,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    marginTop: -spacing.sm,
   },
   available: {
     color: colors.success,

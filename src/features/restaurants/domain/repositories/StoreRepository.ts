@@ -6,9 +6,10 @@ import { StoreCategory } from '../entities/StoreCategory';
  */
 export interface StoreRepository {
   /**
-   * List all active stores, optionally filtered by type (restaurant or market).
+   * List all active stores, optionally filtered by store type (restaurant or
+   * market) and by exact area id (feature 006 regional browsing).
    */
-  getStores(type?: StoreType): Promise<Store[]>;
+  getStores(type?: StoreType, areaId?: string): Promise<Store[]>;
 
   /**
    * Retrieve a single store by its unique ID.

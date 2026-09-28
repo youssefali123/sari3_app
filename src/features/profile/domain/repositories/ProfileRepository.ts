@@ -7,6 +7,7 @@ export interface UpdateProfileInput {
   fullName?: string;
   phone?: string;
   avatarUrl?: string;
+  selectedAreaId?: string | null;
 }
 
 /** Thrown when no profiles row exists for the given user id (trigger failure or database inconsistency). */

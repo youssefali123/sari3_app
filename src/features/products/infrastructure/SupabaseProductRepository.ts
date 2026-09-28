@@ -1,6 +1,8 @@
 import { supabase } from '@/shared/lib/supabase';
+import type { ProductVariantsRow } from '@/shared/types/supabase';
 import { Product } from '../domain/entities/Product';
 import { ProductAddOn } from '../domain/entities/ProductAddOn';
+import { ProductVariant } from '../domain/entities/ProductVariant';
 import { ProductRepository } from '../domain/repositories/ProductRepository';
 
 interface ProductRow {
@@ -49,6 +51,17 @@ function mapAddOn(row: AddOnRow): ProductAddOn {
   };
 }
 
+function mapVariant(row: ProductVariantsRow): ProductVariant {
+  return {
+    id: row.id,
+    productId: row.product_id,
+    name: row.name,
+    price: row.price,
+    isAvailable: row.is_available,
+    displayOrder: row.display_order,
+  };
+}
+
 export class SupabaseProductRepository implements ProductRepository {
   async getProductsByStore(storeId: string, categoryId?: string): Promise<Product[]> {
     let query = supabase
@@ -82,5 +95,16 @@ export class SupabaseProductRepository implements ProductRepository {
       .order('name');
     if (error) throw new Error(error.message);
     return (data ?? []).map(mapAddOn);
+  }
+
+  async getVariantsByProductId(productId: string): Promise<ProductVariant[]> {
+    const { data, error } = await supabase
+      .from('product_variants')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('is_available', true)
+      .order('display_order');
+    if (error) throw new Error(error.message);
+    return (data ?? []).map(mapVariant);
   }
 }

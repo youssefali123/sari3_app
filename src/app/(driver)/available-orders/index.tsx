@@ -11,6 +11,7 @@ import { colors } from '@/shared/ui/theme/colors';
 import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
 import { typography } from '@/shared/ui/theme/typography';
 import { useDriverAvailability } from '@/features/drivers/application/hooks/useDriverAvailability';
+import { useDriverAreas } from '@/features/drivers/application/hooks/useDriverAreas';
 import { useActiveOrder } from '@/features/drivers/application/hooks/useActiveOrder';
 import { useAvailableOrders } from '@/features/drivers/application/hooks/useAvailableOrders';
 import { AvailabilityToggle } from '@/features/drivers/presentation/components/AvailabilityToggle';
@@ -28,6 +29,7 @@ export default function AvailableOrdersScreen() {
   const router = useRouter();
   const { isAvailable, isLoading: availabilityLoading } =
     useDriverAvailability();
+  const { hasAssignedAreas } = useDriverAreas();
   const { activeOrder, isLoading: activeOrderLoading } = useActiveOrder();
   const {
     orders,
@@ -81,6 +83,23 @@ export default function AvailableOrdersScreen() {
         <AvailabilityToggle />
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </View>
+    );
+  }
+
+  // Feature 006 US4: safe-default-deny — a driver with no assigned areas is
+  // told why the pool is empty instead of a generic message.
+  if (!hasAssignedAreas) {
+    return (
+      <View style={styles.container}>
+        <AvailabilityToggle />
+        <View style={styles.centered}>
+          <Text style={styles.areaNoticeTitle}>📍 No delivery areas assigned</Text>
+          <Text style={styles.areaNoticeBody}>
+            No delivery areas assigned: contact dispatch or support to set up
+            your delivery zones.
+          </Text>
         </View>
       </View>
     );
@@ -160,6 +179,16 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
   },
   offlineText: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+  },
+  areaNoticeTitle: {
+    ...typography.h3,
+    color: colors.textPrimary,
+    marginBottom: spacing.sm,
+  },
+  areaNoticeBody: {
     ...typography.body,
     color: colors.textSecondary,
     textAlign: 'center',

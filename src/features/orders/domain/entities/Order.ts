@@ -23,6 +23,8 @@ export interface OrderItemSnapshot {
   orderId: string;
   productId: string;
   productName: string;
+  /** Size/variant label snapshot (e.g. "Large"), null for flat-price items. */
+  variantName: string | null;
   unitPrice: MoneyAmount;
   quantity: number;
   subtotal: MoneyAmount;

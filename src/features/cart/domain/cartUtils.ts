@@ -10,9 +10,13 @@ import { MoneyAmount } from '@/shared/types/common';
  * Generates an order-independent deterministic cart item key.
  * [A, B] and [B, A] produce identical composite keys (BR-003).
  */
-export function generateCartItemId(productId: string, addonIds: string[]): string {
+export function generateCartItemId(
+  productId: string,
+  variantId: string | null,
+  addonIds: string[],
+): string {
   const sorted = [...addonIds].sort();
-  return `${productId}::${sorted.join(',')}`;
+  return `${productId}::${variantId ?? 'base'}::${sorted.join(',')}`;
 }
 
 /**

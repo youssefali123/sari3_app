@@ -1,10 +1,11 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { FavoritesRepository } from '@/features/favorites/domain/repositories/FavoritesRepository';
 import { SupabaseFavoritesRepository } from '@/features/favorites/infrastructure/SupabaseFavoritesRepository';
 import { StoreCard } from '@/features/restaurants/presentation/StoreCard';
+import { useSelectedArea } from '@/features/areas/application/hooks/useSelectedArea';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { LoadingSpinner } from '@/shared/ui/components/LoadingSpinner';
@@ -19,6 +20,7 @@ export default function FavoriteStoresScreen() {
   useRequireAuth('/(customer)/favorites/stores');
   const router = useRouter();
   const customerId = useCurrentCustomerId();
+  const { selectedAreaId, selectedAreaName } = useSelectedArea();
 
   const {
     data: stores,
@@ -31,6 +33,14 @@ export default function FavoriteStoresScreen() {
     enabled: Boolean(customerId),
   });
 
+  // Feature 006: favorites scoped to the currently selected browsing area.
+  // With no area selected, all favorites are shown.
+  const visibleStores = useMemo(() => {
+    if (!stores) return [];
+    if (!selectedAreaId) return stores;
+    return stores.filter((s) => s.areaId === selectedAreaId);
+  }, [stores, selectedAreaId]);
+
   if (isLoading || !customerId) {
     return <LoadingSpinner />;
   }
@@ -42,7 +52,7 @@ export default function FavoriteStoresScreen() {
   return (
     <View style={styles.container}>
       <FlatList
-        data={stores ?? []}
+        data={visibleStores}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <StoreCard
@@ -51,11 +61,19 @@ export default function FavoriteStoresScreen() {
           />
         )}
         ListEmptyComponent={
-          <EmptyState
-            title="No favorite stores"
-            message="Tap the heart on a store to save it here."
-            emoji="❤️"
-          />
+          visibleStores.length === 0 && (stores?.length ?? 0) > 0 ? (
+            <EmptyState
+              title={`No favorites in ${selectedAreaName ?? 'this area'}`}
+              message="Your favorites from other areas are still saved — switch the area to see them."
+              emoji="📍"
+            />
+          ) : (
+            <EmptyState
+              title="No favorite stores"
+              message="Tap the heart on a store to save it here."
+              emoji="❤️"
+            />
+          )
         }
         contentContainerStyle={styles.listContent}
       />

@@ -1,10 +1,12 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
 import { cartSlice } from '@/features/cart/application/cartSlice';
+import { areaSlice } from '@/features/areas/application/areaSlice';
 
 export const store = configureStore({
   reducer: {
     cart: cartSlice.reducer,
+    area: areaSlice.reducer,
   },
 });
 

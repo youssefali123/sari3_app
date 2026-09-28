@@ -41,6 +41,7 @@ interface OrderItemRow {
   quantity: number | string;
   subtotal: number | string | null;
   addon_snapshots: unknown;
+  variant_name: string | null;
 }
 
 function mapOrderItem(row: OrderItemRow): OrderItemSnapshot {
@@ -49,6 +50,7 @@ function mapOrderItem(row: OrderItemRow): OrderItemSnapshot {
     orderId: row.order_id ?? '',
     productId: row.product_id,
     productName: row.product_name,
+    variantName: row.variant_name,
     unitPrice: Number(row.unit_price),
     quantity: Number(row.quantity),
     subtotal: Number(row.subtotal ?? 0),

@@ -12,6 +12,7 @@ interface RestaurantRow {
   address: string | null;
   rating: number | null;
   is_open: boolean | null;
+  area_id: string;
   created_at: string | null;
 }
 
@@ -25,6 +26,7 @@ function mapStore(row: RestaurantRow): Store {
     address: row.address ?? '',
     rating: row.rating,
     isOpen: row.is_open ?? false,
+    areaId: row.area_id,
     createdAt: row.created_at ?? '',
   };
 }
@@ -48,10 +50,14 @@ function mapCategory(row: CategoryRow): StoreCategory {
 }
 
 export class SupabaseStoreRepository implements StoreRepository {
-  async getStores(type?: StoreType): Promise<Store[]> {
+  async getStores(type?: StoreType, areaId?: string): Promise<Store[]> {
     let query = supabase.from('restaurants').select('*').order('name');
     if (type) {
       query = query.eq('type', type);
+    }
+    if (areaId) {
+      // Exact-match regional browsing (feature 006 FR-013) — no rollups.
+      query = query.eq('area_id', areaId);
     }
     const { data, error } = await query;
     if (error) throw new Error(error.message);

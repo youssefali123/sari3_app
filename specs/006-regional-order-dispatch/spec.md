@@ -8,6 +8,16 @@
 
 **Input**: User description: "create a specification for i want to create and all details in this file: @[mds/regional-order-dispatch.md]"
 
+## Clarifications
+
+### Session 2026-09-26
+
+- Q: How should Arabic and English area names be stored in the `areas` table? → A: Separate columns `name_en` and `name_ar`; the client picks the display value by device locale.
+- Q: On first app launch with no saved area, should the app block browsing behind an area picker or auto-default to a primary region? → A: Auto-default to the primary region with the one-tap area changer visible (no blocking picker).
+- Q: When a guest who selected Area X logs into an account whose profile already saved Area Y, which area wins? → A: The saved profile area wins; Area Y stays active and the guest selection is discarded.
+- Q: How should the migration resolve the `test-driver` / `test-driver2` accounts when seeding `driver_areas`? → A: Resolve by full account email (`test-driver@example.com`, `test-driver2@example.com`); fail the migration with a clear error if an account is absent (never silently skip).
+- Q: When an area still referenced by profiles is deleted, should the database block the delete or null out the preference? → A: Block the delete (foreign key `ON DELETE RESTRICT`); the app-level fallback to the default area applies only to genuinely corrupt/dangling references.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - Customer Area Drill-Down Selection & Store Filtering (Priority: P1)
@@ -44,7 +54,7 @@ A customer must be able to select an area immediately without being forced to lo
 2. **Given** an authenticated customer selects an area, **When** the selection changes, **Then** the selected area is updated in client state and persisted to their server profile.
 3. **Given** an unauthenticated guest has selected Area X and subsequently signs in or creates an account, **When** authentication completes, **Then** Area X is saved as their profile's preferred area.
 4. **Given** an authenticated customer who previously selected Area Y logs into the app on a fresh session, **When** their profile is loaded, **Then** Area Y is restored as the active selected area.
-5. **Given** a customer has no previously saved area in client state or profile, **When** they first launch the app, **Then** the app prompts them with the area selection interface or defaults to a designated default region while inviting selection.
+5. **Given** a customer has no previously saved area in client state or profile, **When** they first launch the app, **Then** the app auto-defaults to the designated primary region and displays the one-tap area changer (FR-017) without blocking browsing behind a picker.
 
 ---
 
@@ -102,7 +112,7 @@ Area reference data is publicly readable to allow guest and customer browsing. H
 
 ### User Story 6 - Existing Catalog Backfill and Migration Integrity (Priority: P2)
 
-When the regional dispatch database migration is applied, all existing seeded restaurants in the platform must be backfilled to a valid, real area record rather than leaving their `area_id` as `NULL`. The `area_id` column on `restaurants` is established as mandatory (`NOT NULL`), guaranteeing that no existing store silently vanishes from customer browsing or driver fulfillment upon deployment. Additionally, the migration MUST seed initial test driver assignments (linking standard platform test driver accounts such as `test-driver` and `test-driver2` to the Fayoum region in `driver_areas`); otherwise, due to the safe-default-deny rule, test driver accounts would immediately see an empty available-orders pool post-migration.
+When the regional dispatch database migration is applied, all existing seeded restaurants in the platform must be backfilled to a valid, real area record rather than leaving their `area_id` as `NULL`. The `area_id` column on `restaurants` is established as mandatory (`NOT NULL`), guaranteeing that no existing store silently vanishes from customer browsing or driver fulfillment upon deployment. Additionally, the migration MUST seed initial test driver assignments (linking standard platform test driver accounts `test-driver@example.com` and `test-driver2@example.com` to the Fayoum region in `driver_areas`); otherwise, due to the safe-default-deny rule, test driver accounts would immediately see an empty available-orders pool post-migration.
 
 **Why this priority**: Operational continuity. Prevents existing partner restaurants and test catalog items from becoming orphaned or invisible in production, and prevents test driver accounts from losing pool visibility.
 
@@ -113,7 +123,7 @@ When the regional dispatch database migration is applied, all existing seeded re
 1. **Given** an existing database with restaurants lacking area associations, **When** the regional dispatch migration runs, **Then** a default/primary area (e.g., "Fayoum") is established and all existing restaurants are backfilled to valid area IDs.
 2. **Given** the migration completes, **When** checking the `restaurants` schema constraints, **Then** `area_id` is defined as `NOT NULL` with a foreign key referencing `areas(id)`.
 3. **Given** a customer selects the backfilled area in the app, **When** browsing the store catalog, **Then** all pre-existing seeded restaurants appear in the results.
-4. **Given** test driver accounts exist in the database (e.g., `test-driver`, `test-driver2`), **When** the regional dispatch migration runs, **Then** the migration seeds explicit assignments for these drivers linking them to the primary Fayoum area in `driver_areas`, allowing immediate verification and end-to-end testing of the order pool.
+4. **Given** test driver accounts exist in the database (identified by full account email: `test-driver@example.com`, `test-driver2@example.com`), **When** the regional dispatch migration runs, **Then** the migration resolves each account by email and seeds explicit assignments linking them to the primary Fayoum area in `driver_areas`, failing with a clear error if an account is absent; silent skipping is forbidden.
 
 ---
 
@@ -126,7 +136,7 @@ When the regional dispatch database migration is applied, all existing seeded re
 - **Deactivated or deleted areas**: Reference areas are soft-managed or preserved; foreign key constraints prevent deleting an area that is referenced by restaurants or driver assignments.
 - **Driver pool signals during area filtering**: When an order is created or claimed anywhere on the platform, `driver_pool_signals` emits an event. The driver client refetches `get_available_orders()`. The server evaluates the driver's current assigned areas and returns only relevant orders. No unfiltered data is ever exposed to the client.
 - **Offline / Network failure during area switch**: If the customer selects a new area while offline or during a network failure, the client retains the user's intent in local state, displays cached stores if available, or presents a network retry state without crashing.
-- **Customer with deleted/invalid saved area**: If an authenticated user's profile references an area ID that no longer exists in `areas`, the application gracefully falls back to the top-level default area or prompts for re-selection.
+- **Customer with deleted/invalid saved area**: Area foreign keys (`restaurants.area_id`, `driver_areas.area_id`, `profiles.selected_area_id`) use `ON DELETE RESTRICT`, so an area referenced by any store, assignment, or profile cannot be deleted. If an authenticated user's profile references an area ID that is nonetheless missing (corrupt data), the application gracefully falls back to the top-level default area or prompts for re-selection.
 
 ---
 
@@ -138,7 +148,7 @@ When the regional dispatch database migration is applied, all existing seeded re
 - **FR-002**: System MUST allow arbitrary depth of area hierarchy (e.g., governorate, city, region, village) via the `parent_area_id` relationship without requiring schema alterations.
 - **FR-003**: System MUST NOT store or parse area hierarchy as delimited strings.
 - **FR-004**: System MUST associate each store (restaurant or market) with exactly one area (`restaurants.area_id`), referencing a valid area identifier.
-- **FR-005**: System MUST enforce that `restaurants.area_id` is mandatory (`NOT NULL`) in production, with all existing restaurants backfilled to valid areas during migration, and standard test driver accounts (`test-driver`, `test-driver2`) seeded with explicit assignments to the primary Fayoum area in `driver_areas` to preserve testability and prevent empty test pools.
+- **FR-005**: System MUST enforce that `restaurants.area_id` is mandatory (`NOT NULL`) in production, with all existing restaurants backfilled to valid areas during migration, and standard test driver accounts (`test-driver@example.com`, `test-driver2@example.com`) seeded with explicit assignments to the primary Fayoum area in `driver_areas` to preserve testability and prevent empty test pools.
 - **FR-006**: System MUST support an explicit many-to-many relationship between drivers and areas (`driver_areas`) where each association links one driver to one area.
 - **FR-007**: System MUST treat driver area assignments as explicit and non-inheriting: an assignment to a parent area MUST NOT grant visibility into child areas, and an assignment to a child area MUST NOT grant visibility into parent areas.
 - **FR-008**: System MUST filter the Driver Available Orders pool (`get_available_orders()`) strictly on the server: an order MUST be included ONLY if the order's restaurant `area_id` matches one of the calling driver's explicit assignments in `driver_areas`.
@@ -149,7 +159,7 @@ When the regional dispatch database migration is applied, all existing seeded re
 - **FR-013**: System MUST filter customer store browsing by exact match on the single chosen `area_id`; selecting a parent area MUST NOT return stores assigned to child areas, and selecting a child area MUST NOT return stores assigned to parent areas.
 - **FR-014**: System MUST store the currently selected area in client-local state (Redux Toolkit) so that unauthenticated guest customers can select an area and browse stores without logging in.
 - **FR-015**: System MUST persist the selected area to the user's profile (`profiles`) upon selection for authenticated customers, and automatically sync it to client-local state upon login.
-- **FR-016**: System MUST automatically save the guest's active area selection to their newly authenticated profile when a guest registers or logs in.
+- **FR-016**: System MUST automatically save the guest's active area selection to their newly authenticated profile when a guest registers or logs in, but ONLY when the profile has no previously saved area. If the profile already has a saved area, the saved area wins and the guest selection is discarded.
 - **FR-017**: System MUST display an indicator of the currently selected area on the customer home screen with a one-tap action to change the selected area.
 - **FR-018**: System MUST display a dedicated empty state on the customer home screen when no stores are available in the selected area.
 - **FR-019**: System MUST display a dedicated empty state on the driver available orders screen when the driver has no assigned areas.
@@ -167,7 +177,8 @@ When the regional dispatch database migration is applied, all existing seeded re
 
 - **Area (`areas`)**:
   - `id`: Unique identifier (UUID).
-  - `name`: Human-readable name of the area (e.g., "Fayoum", "Senours", "Itsa") in Arabic/English.
+  - `name_en`: Human-readable name of the area in English (e.g., "Fayoum", "Senours", "Itsa").
+  - `name_ar`: Human-readable name of the area in Arabic. The client displays `name_ar` or `name_en` according to the device locale.
   - `parent_area_id`: Optional self-referencing identifier linking to a parent `Area`. When `null`, represents a top-level area (e.g., governorate).
   - `created_at`: Creation timestamp.
   - *Relationship*: Self-referencing tree; one-to-many with `restaurants`; many-to-many with `driver_profiles` via `driver_areas`.
@@ -217,5 +228,5 @@ When the regional dispatch database migration is applied, all existing seeded re
 - **Single Area per Store**: Each restaurant or market belongs to exactly one physical area (represented by a single `area_id` foreign key). Multi-branch stores are represented as separate store records if located in different areas.
 - **No Geolocation/GPS**: Geolocation detection, GPS coordinates, distance calculations, and delivery radius bounding are explicitly excluded from this feature and will not be introduced.
 - **Cart Independence**: The cart remains tied to a single store. Changing the selected area in the browsing UI filters the store list but does not clear the cart. If a customer adds an item from another store, existing cart replacement confirmation rules apply.
-- **Backfill & Test Driver Seeding Strategy**: All existing stores in the database will be assigned to a designated default area (e.g., Fayoum city center) during migration, ensuring no existing test or seed data becomes inaccessible. Furthermore, standard test driver accounts (`test-driver` and `test-driver2`) will be seeded with explicit assignments to the primary Fayoum area during migration, preventing them from being blocked by the safe-default-deny rule immediately after migration.
+- **Backfill & Test Driver Seeding Strategy**: All existing stores in the database will be assigned to a designated default area (e.g., Fayoum city center) during migration, ensuring no existing test or seed data becomes inaccessible. Furthermore, standard test driver accounts (`test-driver@example.com` and `test-driver2@example.com`) will be seeded with explicit assignments to the primary Fayoum area during migration, preventing them from being blocked by the safe-default-deny rule immediately after migration.
 - **Safe-Default-Deny**: A driver with no assigned areas is intentionally treated as inactive for order dispatch, seeing zero orders until an administrator links them to at least one area.

@@ -14,6 +14,8 @@ export interface UserProfile {
   role: UserRole;
   phone: string | null;
   avatarUrl: string | null;
+  /** Customer's persisted browsing-area preference (feature 006). */
+  selectedAreaId: string | null;
   createdAt: string;
   updatedAt: string;
 }

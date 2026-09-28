@@ -18,6 +18,7 @@ import {
 function toRpcItems(input: PlaceOrderInput['items']) {
   return input.map((item) => ({
     product_id: item.productId,
+    variant_id: item.variantId ?? null,
     quantity: item.quantity,
     addon_ids: item.addonIds,
   }));
@@ -48,6 +49,7 @@ interface OrderItemRow {
   quantity: number | string;
   subtotal: number | string | null;
   addon_snapshots: unknown;
+  variant_name: string | null;
 }
 
 function mapOrderItem(row: OrderItemRow): OrderItemSnapshot {
@@ -56,6 +58,7 @@ function mapOrderItem(row: OrderItemRow): OrderItemSnapshot {
     orderId: row.order_id ?? '',
     productId: row.product_id,
     productName: row.product_name,
+    variantName: row.variant_name,
     unitPrice: Number(row.unit_price),
     quantity: Number(row.quantity),
     subtotal: Number(row.subtotal ?? 0),
@@ -147,6 +150,7 @@ export class SupabaseOrderRepository implements OrderRepository {
         orderId: string;
         productId: string;
         productName: string;
+        variantName: string | null;
         unitPrice: number | string;
         quantity: number | string;
         subtotal: number | string;
@@ -174,6 +178,7 @@ export class SupabaseOrderRepository implements OrderRepository {
         orderId: item.orderId,
         productId: item.productId,
         productName: item.productName,
+        variantName: item.variantName,
         unitPrice: Number(item.unitPrice),
         quantity: Number(item.quantity),
         subtotal: Number(item.subtotal),

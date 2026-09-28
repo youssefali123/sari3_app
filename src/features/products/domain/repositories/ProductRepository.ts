@@ -1,5 +1,6 @@
 import { Product } from '../entities/Product';
 import { ProductAddOn } from '../entities/ProductAddOn';
+import { ProductVariant } from '../entities/ProductVariant';
 
 /**
  * Abstraction for product catalog data access.
@@ -19,4 +20,10 @@ export interface ProductRepository {
    * Retrieve all available add-ons for a specific product.
    */
   getAddOnsByProductId(productId: string): Promise<ProductAddOn[]>;
+
+  /**
+   * Retrieve all variants (e.g. sizes) for a specific product. A non-empty
+   * result means the product REQUIRES a variant choice when ordering.
+   */
+  getVariantsByProductId(productId: string): Promise<ProductVariant[]>;
 }

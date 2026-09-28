@@ -70,6 +70,7 @@ export default function CheckoutScreen() {
     () =>
       items.map((item) => ({
         productId: item.productId,
+        variantId: item.variantId,
         quantity: item.quantity,
         addonIds: item.addonIds,
       })),

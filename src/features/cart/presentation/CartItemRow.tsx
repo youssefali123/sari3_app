@@ -21,7 +21,10 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
   return (
     <View style={styles.row}>
       <View style={styles.info}>
-        <Text style={styles.name}>{item.productName}</Text>
+        <Text style={styles.name}>
+          {item.productName}
+          {item.variantName ? ` — ${item.variantName}` : ''}
+        </Text>
         {item.selectedAddOns.length > 0 ? (
           <Text style={styles.addOns} numberOfLines={2}>
             {item.selectedAddOns.map((a) => a.name).join(', ')}

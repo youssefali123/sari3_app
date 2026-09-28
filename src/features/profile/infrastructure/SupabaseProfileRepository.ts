@@ -18,6 +18,7 @@ function mapProfile(row: ProfilesRow): UserProfile {
     role: row.role === 'driver' ? 'driver' : 'customer',
     phone: row.phone,
     avatarUrl: row.avatar_url,
+    selectedAreaId: row.selected_area_id,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -31,7 +32,7 @@ export class SupabaseProfileRepository implements ProfileRepository {
   async getProfile(userId: string): Promise<UserProfile> {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, role, phone, avatar_url, created_at, updated_at')
+      .select('id, full_name, role, phone, avatar_url, selected_area_id, created_at, updated_at')
       .eq('id', userId)
       .single();
 
@@ -51,10 +52,13 @@ export class SupabaseProfileRepository implements ProfileRepository {
         ...(input.fullName !== undefined ? { full_name: input.fullName } : {}),
         ...(input.phone !== undefined ? { phone: input.phone } : {}),
         ...(input.avatarUrl !== undefined ? { avatar_url: input.avatarUrl } : {}),
+        ...(input.selectedAreaId !== undefined
+          ? { selected_area_id: input.selectedAreaId }
+          : {}),
         updated_at: new Date().toISOString(),
       })
       .eq('id', userId)
-      .select('id, full_name, role, phone, avatar_url, created_at, updated_at')
+      .select('id, full_name, role, phone, avatar_url, selected_area_id, created_at, updated_at')
       .single();
 
     if (error) throw new Error(error.message);

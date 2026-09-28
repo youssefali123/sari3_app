@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
@@ -8,12 +8,7 @@ import { ProductRepository } from '@/features/products/domain/repositories/Produ
 import { SupabaseProductRepository } from '@/features/products/infrastructure/SupabaseProductRepository';
 import { CategoryTabBar } from '@/features/restaurants/presentation/CategoryTabBar';
 import { ProductCard } from '@/features/products/presentation/ProductCard';
-import { AddOnSelectorModal } from '@/features/products/presentation/AddOnSelectorModal';
 import { StoreConflictModal } from '@/features/cart/presentation/StoreConflictModal';
-import { useAddToCart } from '@/features/cart/application/useAddToCart';
-import { CartItem } from '@/features/cart/domain/entities/CartItem';
-import { generateCartItemId } from '@/features/cart/domain/cartUtils';
-import { Product } from '@/features/products/domain/entities/Product';
 import { LoadingSpinner } from '@/shared/ui/components/LoadingSpinner';
 import { ErrorView } from '@/shared/ui/components/ErrorView';
 import { EmptyState } from '@/shared/ui/components/EmptyState';
@@ -28,10 +23,8 @@ export default function StoreDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const storeId = id as string;
   const router = useRouter();
-  const { addItemWithConflictCheck } = useAddToCart();
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [productForModal, setProductForModal] = useState<Product | null>(null);
 
   const storeQuery = useQuery({
     queryKey: ['store', storeId],
@@ -51,49 +44,8 @@ export default function StoreDetailScreen() {
     enabled: Boolean(storeId),
   });
 
-  const addOnsQuery = useQuery({
-    queryKey: ['addOns', productForModal?.id],
-    queryFn: () => productRepository.getAddOnsByProductId(productForModal!.id),
-    enabled: Boolean(productForModal),
-  });
-
   const store = storeQuery.data;
   const storeIsOpen = store?.isOpen ?? false;
-
-  const handleConfirmAddOns = useCallback(
-    (selectedAddOnIds: string[]) => {
-      if (!productForModal || !store) return;
-      const allAddOns = addOnsQuery.data ?? [];
-      const selectedAddOns = selectedAddOnIds
-        .map((addonId) => allAddOns.find((a) => a.id === addonId))
-        .filter((a): a is NonNullable<typeof a> => Boolean(a))
-        .map((a) => ({
-          addonId: a.id,
-          name: a.name,
-          unitPrice: a.price,
-        }));
-
-      const item: CartItem = {
-        id: generateCartItemId(productForModal.id, selectedAddOnIds),
-        productId: productForModal.id,
-        productName: productForModal.name,
-        productImageUrl: productForModal.imageUrl,
-        baseUnitPrice: productForModal.price,
-        addonIds: selectedAddOnIds,
-        selectedAddOns,
-        quantity: 1,
-      };
-
-      addItemWithConflictCheck({
-        item,
-        storeId: store.id,
-        storeName: store.name,
-      });
-      setProductForModal(null);
-      router.push('/(customer)/cart');
-    },
-    [productForModal, store, addOnsQuery.data, addItemWithConflictCheck, router],
-  );
 
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
 
@@ -132,7 +84,7 @@ export default function StoreDetailScreen() {
           <ProductCard
             product={item}
             storeIsOpen={storeIsOpen}
-            onPress={() => setProductForModal(item)}
+            onPress={() => router.push(`/product/${item.id}`)}
           />
         )}
         ListEmptyComponent={
@@ -149,13 +101,6 @@ export default function StoreDetailScreen() {
         contentContainerStyle={styles.listContent}
       />
 
-      <AddOnSelectorModal
-        visible={Boolean(productForModal)}
-        product={productForModal}
-        addOns={addOnsQuery.data ?? []}
-        onClose={() => setProductForModal(null)}
-        onConfirm={handleConfirmAddOns}
-      />
       <StoreConflictModal />
     </View>
   );

@@ -15,9 +15,13 @@ export interface CartAddOnSelection {
  * generateCartItemId(productId, addonIds) — order-independent.
  */
 export interface CartItem {
-  id: string; // Composite key: `${productId}::${sortedAddonIds.join(',')}`
+  id: string; // Composite key: `${productId}::${variantId}::${sortedAddonIds.join(',')}`
   productId: string;
   productName: string;
+  /** Selected variant id — required at order time for variant products. */
+  variantId: string | null;
+  /** Selected size/variant label, null for flat-price products. */
+  variantName: string | null;
   productImageUrl: string | null;
   baseUnitPrice: MoneyAmount;
   addonIds: string[]; // Standardized add-on identifier array

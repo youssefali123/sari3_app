@@ -7,6 +7,8 @@ export interface PlaceOrderInput {
   couponCode?: string | null;
   items: {
     productId: string;
+    /** Required when the product has purchasable variants (e.g. sizes). */
+    variantId?: string | null;
     quantity: number;
     addonIds: string[];
   }[];

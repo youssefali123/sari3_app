@@ -213,6 +213,7 @@ A customer with an active order accepted by a driver can view that driver's name
 - **FR-022**: Access to driver information MUST be enforced server-side and scoped to the specific order. No driver information MUST be returned when the order does not belong to the requesting customer, has no driver assigned, or has transitioned to `delivered`, `cancelled`, or `rejected`.
 - **FR-023**: Category navigation within a store is a presentation concern. No business logic MUST reside in category tab switching.
 - **FR-024**: The system MUST prevent customers from adding products to the cart when the owning store is closed, and the server MUST reject order placement if the store is not open.
+- **FR-024a (amended by feature 007)**: The product configuration UI (variants + add-ons) originally delivered as the AddOnSelectorModal bottom-sheet has been superseded by a dedicated full-screen product detail route (`/product/[id]`, feature 007-product-detail-screen). The closed-store add-disable rule of this FR carries over unchanged to that screen; the modal is removed as a reachable UI pattern.
 
 ### Required Domain and Application Capabilities
 

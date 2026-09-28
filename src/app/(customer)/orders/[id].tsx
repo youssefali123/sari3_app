@@ -155,6 +155,7 @@ export default function OrderDetailScreen() {
             <View style={styles.itemInfo}>
               <Text style={styles.itemName}>
                 {item.quantity} × {item.productName}
+                {item.variantName ? ` — ${item.variantName}` : ''}
               </Text>
               {item.addonSnapshots.map((addon) => (
                 <Text key={addon.addonId} style={styles.addOnText}>

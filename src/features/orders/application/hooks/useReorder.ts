@@ -80,10 +80,27 @@ export function useReorder() {
             omitted.add(`${snapshot.productName} (some add-ons)`);
           }
 
+          // Variant revalidation: match the snapshot variant by name against
+          // the product's live variants.
+          let variantId: string | null = null;
+          let variantName: string | null = null;
+          if (snapshot.variantName) {
+            const liveVariants = await productRepository.getVariantsByProductId(product.id);
+            const liveVariant = liveVariants.find((v) => v.name === snapshot.variantName);
+            if (!liveVariant) {
+              omitted.add(`${product.name} (${snapshot.variantName})`);
+              continue;
+            }
+            variantId = liveVariant.id;
+            variantName = liveVariant.name;
+          }
+
           items.push({
-            id: generateCartItemId(product.id, addonIds),
+            id: generateCartItemId(product.id, variantId, addonIds),
             productId: product.id,
             productName: product.name,
+            variantId,
+            variantName,
             productImageUrl: product.imageUrl,
             baseUnitPrice: product.price, // current live price, never the snapshot
             addonIds,
