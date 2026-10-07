@@ -1,10 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
+import { useColors } from '@/shared/ui/hooks/useColors';
+import {
+  AppScreen,
+  BrandHeader,
+  EmptyState,
+  LoadingState,
+  PageScroll,
+  PrimaryButton,
+  Surface,
+} from '@/shared/ui/components';
 import {
   CANCELLED_NOTICE_QUERY_KEY,
   CancelledOrderNotice,
@@ -18,18 +25,17 @@ import { SupabaseOrderRepository } from '@/features/orders/infrastructure/Supaba
 
 const orderRepository: OrderRepository = new SupabaseOrderRepository();
 
-/** Strictly sequential stepper: accepted → preparing → out_for_delivery → delivered. */
+/** Strictly sequential stepper with Arabic labels matching SOURCE */
 const NEXT_STEP_LABELS: Record<string, string> = {
-  accepted: 'Store is Preparing',
-  preparing: 'Out for Delivery',
-  out_for_delivery: 'Delivered',
+  accepted: 'بدء تجهيز الطلب بالمحل',
+  preparing: 'استلمت الطلب، ابدأ التوصيل',
+  out_for_delivery: 'تأكيد تسليم الطلب للعميل',
 };
 
 /**
- * Active delivery screen. Shows the full claimed order with the single
- * allowed next action; on delivered the active-order query returns null
- * (driver_profiles.current_order_id is cleared by the sync trigger) and the
- * driver lands on the empty state, free to accept new orders.
+ * Active delivery screen.
+ * Upgraded to SOURCE DriverScreens design language with AppScreen, BrandHeader,
+ * Surface cards, and Arabic statuses.
  */
 export default function ActiveOrderScreen() {
   const {
@@ -44,6 +50,7 @@ export default function ActiveOrderScreen() {
   } = useActiveOrder();
   const [releaseModalVisible, setReleaseModalVisible] = useState(false);
   const router = useRouter();
+  const colors = useColors();
   const queryClient = useQueryClient();
   const lastActiveRef = useRef<Order | null>(null);
   const notifiedOrderIds = useRef(new Set<string>());
@@ -54,9 +61,7 @@ export default function ActiveOrderScreen() {
     gcTime: Infinity,
   });
 
-  // US3: when the active order disappears, tell the driver WHY if the
-  // customer cancelled it — never vanish silently. The notice lives in the
-  // query cache and is cleared when the driver claims their next order.
+  // US3: when the active order disappears, tell the driver WHY if the customer cancelled it
   useEffect(() => {
     if (activeOrder) {
       lastActiveRef.current = activeOrder;
@@ -78,15 +83,12 @@ export default function ActiveOrderScreen() {
       .catch(() => undefined);
   }, [activeOrder, queryClient]);
 
-  // US7: a concurrent customer cancellation produces a structured rejection —
-  // show the cancelled notice (the card already renders it from status) and
-  // let realtime refresh resolve the view. Never an unhandled SQL error.
   const handleAdvance = async () => {
     if (!activeOrder) return;
     try {
       const result = await advanceStatus(activeOrder.id);
       if (advanceFailedWith(result, 'ORDER_STATUS_CHANGED')) {
-        Alert.alert('Order cancelled', 'The customer cancelled this order.');
+        Alert.alert('تم إلغاء الطلب', 'قام العميل بإلغاء هذا الطلب.');
       }
     } catch {
       // Other errors surface through the hook's error state.
@@ -95,58 +97,77 @@ export default function ActiveOrderScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <AppScreen>
+        <BrandHeader title="طلباتي النشطة" subtitle="توصيلاتك الحالية" />
+        <LoadingState />
+      </AppScreen>
     );
   }
 
   if (error && !activeOrder) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.secondaryText}>{error.message}</Text>
-      </View>
+      <AppScreen>
+        <BrandHeader title="طلباتي النشطة" subtitle="توصيلاتك الحالية" />
+        <View style={styles.centerContainer}>
+          <Text style={[styles.errorText, { color: colors.destructive }]}>
+            {error.message}
+          </Text>
+        </View>
+      </AppScreen>
     );
   }
 
   if (!activeOrder) {
     if (cancelledNoticeFor) {
       return (
-        <View style={styles.centered}>
-          <View style={styles.cancelledCard}>
-            <Text style={styles.cancelledTitle}>Customer cancelled this order</Text>
-            <Text style={styles.cancelledBody}>
-              The customer cancelled your order from{' '}
-              {cancelledNoticeFor?.storeName}. Your delivery slot is free
-              again.
-            </Text>
-            <TouchableOpacity
-              style={styles.cancelledButton}
-              onPress={() => router.replace('/(driver)/available-orders')}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.cancelledButtonText}>Browse Available Orders</Text>
-            </TouchableOpacity>
+        <AppScreen>
+          <BrandHeader title="طلباتي النشطة" subtitle="توصيلاتك الحالية" />
+          <View style={styles.centerContainer}>
+            <Surface style={[styles.cancelledCard, { borderColor: colors.destructive + '40' }]}>
+              <Text style={[styles.cancelledTitle, { color: colors.destructive }]}>
+                قام العميل بإلغاء الطلب
+              </Text>
+              <Text style={[styles.cancelledBody, { color: colors.foreground }]}>
+                تم إلغاء الطلب التابع لـ {cancelledNoticeFor?.storeName}. أصبح جدول توصيلك متاحاً الآن لاستقبال طلبات جديدة.
+              </Text>
+              <PrimaryButton
+                title="تصفح الطلبات المتاحة"
+                icon="basket"
+                onPress={() => router.replace('/(driver)/available-orders')}
+              />
+            </Surface>
           </View>
-        </View>
+        </AppScreen>
       );
     }
     return (
-      <View style={styles.centered}>
-        <Text style={styles.secondaryText}>
-          No active delivery. Accept an order from the Available tab to start
-          delivering.
-        </Text>
-      </View>
+      <AppScreen>
+        <BrandHeader title="طلباتي النشطة" subtitle="توصيلاتك الحالية" />
+        <View style={styles.centerContainer}>
+          <EmptyState
+            emoji="🛵"
+            title="لا توجد توصيلات نشطة"
+            message="اقبل طلباً من قائمة الطلبات المتاحة ليظهر هنا وتتابع مراحل توصيله."
+            action={
+              <PrimaryButton
+                title="تصفح الطلبات المتاحة"
+                icon="basket"
+                onPress={() => router.replace('/(driver)/available-orders')}
+              />
+            }
+          />
+        </View>
+      </AppScreen>
     );
   }
 
   return (
-    <View style={styles.wrapper}>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={styles.content}
-      >
+    <AppScreen>
+      <BrandHeader
+        title="طلباتي النشطة"
+        subtitle={`طلب ${activeOrder.storeName}`}
+      />
+      <PageScroll>
         <ActiveOrderCard
           order={activeOrder}
           nextStepLabel={NEXT_STEP_LABELS[activeOrder.status] ?? null}
@@ -155,21 +176,13 @@ export default function ActiveOrderScreen() {
           error={error}
           customerCancelled={activeOrder.status === 'cancelled'}
           onReturnToPool={() => router.replace('/(driver)/available-orders')}
+          onRelease={
+            activeOrder.status !== 'delivered' && activeOrder.status !== 'cancelled'
+              ? () => setReleaseModalVisible(true)
+              : undefined
+          }
         />
-
-        {activeOrder.status !== 'delivered' && activeOrder.status !== 'cancelled' ? (
-          <TouchableOpacity
-            style={styles.releaseButton}
-            onPress={() => setReleaseModalVisible(true)}
-            disabled={isReleasing}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.releaseButtonText}>
-              Report Issue / Release Order
-            </Text>
-          </TouchableOpacity>
-        ) : null}
-      </ScrollView>
+      </PageScroll>
 
       <OrderReleaseModal
         visible={releaseModalVisible}
@@ -179,8 +192,6 @@ export default function ActiveOrderScreen() {
           releaseOrder(activeOrder.id, reason)
             .then(() => {
               setReleaseModalVisible(false);
-              // On success the active-order query resolves to null and the
-              // screen shows the empty state — the driver can accept again.
             })
             .catch(() => {
               // Error surfaces through the hook into the modal.
@@ -188,75 +199,34 @@ export default function ActiveOrderScreen() {
         }}
         onClose={() => setReleaseModalVisible(false)}
       />
-    </View>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
+  centerContainer: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    padding: spacing.md,
-    gap: spacing.md,
-  },
-  releaseButton: {
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.md,
-    borderWidth: 1,
-    borderColor: colors.error,
-  },
-  releaseButtonText: {
-    ...typography.body,
-    color: colors.error,
-    fontWeight: '600',
-  },
-  centered: {
-    flex: 1,
+    paddingHorizontal: 18,
     justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
-    backgroundColor: colors.background,
-  },
-  secondaryText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
+    paddingBottom: 60,
   },
   cancelledCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.errorLight,
-    padding: spacing.lg,
-    gap: spacing.sm,
+    padding: 20,
+    borderRadius: 22,
+    gap: 12,
   },
   cancelledTitle: {
-    ...typography.h3,
-    color: colors.error,
-    fontWeight: '700',
+    fontSize: 17,
+    fontWeight: '800',
+    textAlign: 'right',
   },
   cancelledBody: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'right',
   },
-  cancelledButton: {
-    alignSelf: 'flex-start',
-    marginTop: spacing.xs,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.primary,
-  },
-  cancelledButtonText: {
-    ...typography.bodySmall,
-    color: colors.white,
-    fontWeight: '600',
+  errorText: {
+    fontSize: 13,
+    textAlign: 'center',
   },
 });

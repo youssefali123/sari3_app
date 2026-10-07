@@ -7,9 +7,16 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
+import { useColors } from '@/shared/ui/hooks/useColors';
+import {
+  AppScreen,
+  BrandHeader,
+  EmptyState,
+  LoadingState,
+  PrimaryButton,
+  Surface,
+} from '@/shared/ui/components';
+import { Icon } from '@/shared/ui/components/Icon';
 import { useDriverAvailability } from '@/features/drivers/application/hooks/useDriverAvailability';
 import { useDriverAreas } from '@/features/drivers/application/hooks/useDriverAreas';
 import { useActiveOrder } from '@/features/drivers/application/hooks/useActiveOrder';
@@ -18,15 +25,15 @@ import { AvailabilityToggle } from '@/features/drivers/presentation/components/A
 import { AvailableOrderCard } from '@/features/drivers/presentation/components/AvailableOrderCard';
 import { AvailableOrderPreview } from '@/features/drivers/domain/entities/AvailableOrderPreview';
 
-const NOT_AVAILABLE_MESSAGE = 'This order is no longer available.';
+const NOT_AVAILABLE_MESSAGE = 'تم قبول هذا الطلب من قبل سائق آخر أو تم إلغاؤه.';
 
 /**
- * Order pool for Available drivers. Offline hides the pool entirely (US1);
- * while holding an active order the server returns [] and the driver is
- * pointed at the Active tab (one active delivery per driver).
+ * Order pool for Available drivers.
+ * Upgraded to SOURCE DriverScreens design language while keeping all business logic.
  */
 export default function AvailableOrdersScreen() {
   const router = useRouter();
+  const colors = useColors();
   const { isAvailable, isLoading: availabilityLoading } =
     useDriverAvailability();
   const { hasAssignedAreas } = useDriverAreas();
@@ -60,9 +67,11 @@ export default function AvailableOrdersScreen() {
   };
 
   const renderOrder = ({ item }: { item: AvailableOrderPreview }) => (
-    <View>
+    <View style={styles.orderWrapper}>
       {lostRaceOrderId === item.id ? (
-        <Text style={styles.lostRaceText}>{NOT_AVAILABLE_MESSAGE}</Text>
+        <Text style={[styles.lostRaceText, { color: colors.destructive }]}>
+          {NOT_AVAILABLE_MESSAGE}
+        </Text>
       ) : null}
       <AvailableOrderCard
         order={item}
@@ -77,74 +86,53 @@ export default function AvailableOrdersScreen() {
     </View>
   );
 
-  if (availabilityLoading || activeOrderLoading) {
-    return (
-      <View style={styles.container}>
-        <AvailabilityToggle />
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      </View>
-    );
-  }
-
-  // Feature 006 US4: safe-default-deny — a driver with no assigned areas is
-  // told why the pool is empty instead of a generic message.
-  if (!hasAssignedAreas) {
-    return (
-      <View style={styles.container}>
-        <AvailabilityToggle />
-        <View style={styles.centered}>
-          <Text style={styles.areaNoticeTitle}>📍 No delivery areas assigned</Text>
-          <Text style={styles.areaNoticeBody}>
-            No delivery areas assigned: contact dispatch or support to set up
-            your delivery zones.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (!isAvailable) {
-    return (
-      <View style={styles.container}>
-        <AvailabilityToggle />
-        <View style={styles.centered}>
-          <Text style={styles.offlineText}>
-            You are currently offline. Go online to view and accept orders.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
-  if (activeOrder) {
-    return (
-      <View style={styles.container}>
-        <AvailabilityToggle />
-        <View style={styles.centered}>
-          <Text style={styles.offlineText}>
-            You have an active delivery. Complete it before accepting new
-            orders.
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
-    <View style={styles.container}>
+    <AppScreen>
+      <BrandHeader title="الطلبات المتاحة" subtitle="جاهزة للتوصيل حولك" />
       <AvailabilityToggle />
-      {poolLoading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={colors.primary} />
+
+      {availabilityLoading || activeOrderLoading ? (
+        <LoadingState />
+      ) : !hasAssignedAreas ? (
+        <View style={styles.centerContainer}>
+          <EmptyState
+            emoji="📍"
+            title="لم يتم تعيين مناطق توصيل"
+            message="يرجى التواصل مع الإدارة أو الدعم الفني لتفعيل نطاقات التوصيل الخاصة بك."
+          />
         </View>
+      ) : !isAvailable ? (
+        <View style={styles.centerContainer}>
+          <EmptyState
+            emoji="🛵"
+            title="أنت غير متصل حالياً"
+            message="قم بتفعيل وضع الاتصال في الأعلى لاستقبال وتصفح طلبات التوصيل المتاحة."
+          />
+        </View>
+      ) : activeOrder ? (
+        <View style={styles.centerContainer}>
+          <EmptyState
+            emoji="📦"
+            title="لديك توصيلة نشطة حالياً"
+            message="أكمل الطلب النشط في تبويب 'طلباتي النشطة' لتتمكن من استقبال طلبات جديدة."
+            action={
+              <PrimaryButton
+                title="الانتقال إلى التوصيلة النشطة"
+                icon="bicycle"
+                onPress={() => router.replace('/(driver)/active-order' as never)}
+              />
+            }
+          />
+        </View>
+      ) : poolLoading ? (
+        <LoadingState />
       ) : orders.length === 0 ? (
-        <View style={styles.centered}>
-          <Text style={styles.offlineText}>
-            No available orders right now. New orders will appear here
-            automatically.
-          </Text>
+        <View style={styles.centerContainer}>
+          <EmptyState
+            emoji="🛵"
+            title="لا توجد طلبات متاحة الآن"
+            message="ستظهر الطلبات الجديدة هنا فور قيام العملاء بالطلب في منطقتك."
+          />
         </View>
       ) : (
         <FlatList
@@ -153,63 +141,98 @@ export default function AvailableOrdersScreen() {
           data={orders}
           keyExtractor={(item) => item.id}
           renderItem={renderOrder}
+          ListHeaderComponent={
+            <Surface style={[styles.driverIntro, { backgroundColor: colors.secondary }]}>
+              <View style={[styles.driverIcon, { backgroundColor: colors.card }]}>
+                <Icon name="Bike" size={23} color={colors.secondaryForeground} />
+              </View>
+              <View style={styles.introCopy}>
+                <Text style={[styles.introTitle, { color: colors.secondaryForeground }]}>
+                  متاح لاستلام الطلبات
+                </Text>
+                <Text style={[styles.introSubtitle, { color: colors.secondaryForeground + 'B3' }]}>
+                  اختر طلباً لعرض تفاصيله وقبوله للتوصيل.
+                </Text>
+              </View>
+            </Surface>
+          }
           ListFooterComponent={
-            error ? <Text style={styles.errorText}>{error.message}</Text> : null
+            error ? (
+              <Text style={[styles.errorText, { color: colors.destructive }]}>
+                {error.message}
+              </Text>
+            ) : null
           }
         />
       )}
+
       {isClaiming ? (
         <View style={styles.claimingOverlay}>
-          <ActivityIndicator size="large" color={colors.white} />
+          <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : null}
-    </View>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  centered: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: spacing.lg,
-  },
-  offlineText: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  areaNoticeTitle: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    marginBottom: spacing.sm,
-  },
-  areaNoticeBody: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
   pool: {
     flex: 1,
   },
   poolContent: {
-    padding: spacing.md,
-    gap: spacing.md,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    gap: 12,
+    paddingBottom: 120,
+  },
+  orderWrapper: {
+    gap: 6,
+  },
+  centerContainer: {
+    flex: 1,
+    paddingHorizontal: 18,
+    justifyContent: 'center',
+    paddingBottom: 60,
+  },
+  driverIntro: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 4,
+  },
+  driverIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  introCopy: {
+    flex: 1,
+    alignItems: 'flex-end',
+    gap: 3,
+  },
+  introTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  introSubtitle: {
+    fontSize: 12,
+    textAlign: 'right',
   },
   lostRaceText: {
-    ...typography.caption,
-    color: colors.error,
-    marginBottom: spacing.xs,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'right',
+    paddingHorizontal: 4,
   },
   errorText: {
-    ...typography.bodySmall,
-    color: colors.error,
+    fontSize: 12,
     textAlign: 'center',
-    padding: spacing.md,
+    padding: 12,
   },
   claimingOverlay: {
     position: 'absolute',
@@ -217,9 +240,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.35)',
+    backgroundColor: 'rgba(0, 0, 0, 0.4)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: borderRadius.md,
   },
 });

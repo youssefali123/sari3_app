@@ -11,6 +11,15 @@ const areaRepository: AreaRepository = new SupabaseAreaRepository();
 const profileRepository: ProfileRepository = new SupabaseProfileRepository();
 
 /**
+ * Session-scoped reconciliation guard. MUST be module-level, not a ref:
+ * every screen calling this hook gets its own hook instance, and a
+ * per-instance ref let each newly mounted screen (e.g. the browse screen)
+ * re-run the "profile wins" restore with the STALE in-memory profile,
+ * reverting a just-chosen area until the next reload.
+ */
+let syncedUserId: string | null = null;
+
+/**
  * Area selection state (feature 006 US2, dual ownership):
  * - Redux owns the active selection for the browsing UI (works for guests).
  * - Authenticated customers: every change also persists to
@@ -26,20 +35,33 @@ export function useSelectedArea() {
   const dispatch = useAppDispatch();
   const { user, profile } = useAuth();
   const area = useAppSelector(selectArea);
-  const syncedUserIdRef = useRef<string | null>(null);
+  // Live mirror of the Redux selection, read inside async callbacks.
+  const latestAreaIdRef = useRef(area.selectedAreaId);
+  useEffect(() => {
+    latestAreaIdRef.current = area.selectedAreaId;
+  }, [area.selectedAreaId]);
 
   // One-time reconciliation per login/session.
   useEffect(() => {
-    if (!user || !profile) return;
-    if (syncedUserIdRef.current === user.id) return;
-    syncedUserIdRef.current = user.id;
+    if (!user) {
+      // Logout resets the session guard so the next login re-syncs.
+      syncedUserId = null;
+      return;
+    }
+    if (!profile) return;
+    if (syncedUserId === user.id) return;
+    syncedUserId = user.id;
 
     if (profile.selectedAreaId) {
       if (profile.selectedAreaId !== area.selectedAreaId) {
         // Profile wins at login: restore the saved area (resolve its name).
+        const selectionAtSync = area.selectedAreaId;
         areaRepository
           .getAreas()
           .then((areas) => {
+            // The user may have picked another area while this was in
+            // flight — their live choice always wins over the restore.
+            if (latestAreaIdRef.current !== selectionAtSync) return;
             const saved = areas.find((a) => a.id === profile.selectedAreaId);
             dispatch(
               setArea({

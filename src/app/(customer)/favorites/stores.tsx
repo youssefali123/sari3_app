@@ -8,11 +8,14 @@ import { StoreCard } from '@/features/restaurants/presentation/StoreCard';
 import { useSelectedArea } from '@/features/areas/application/hooks/useSelectedArea';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
-import { LoadingSpinner } from '@/shared/ui/components/LoadingSpinner';
-import { ErrorView } from '@/shared/ui/components/ErrorView';
-import { EmptyState } from '@/shared/ui/components/EmptyState';
-import { colors } from '@/shared/ui/theme/colors';
-import { spacing } from '@/shared/ui/theme/spacing';
+import {
+  AppScreen,
+  BrandHeader,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PrimaryButton,
+} from '@/shared/ui/components';
 
 const favoritesRepository: FavoritesRepository = new SupabaseFavoritesRepository();
 
@@ -34,60 +37,81 @@ export default function FavoriteStoresScreen() {
   });
 
   // Feature 006: favorites scoped to the currently selected browsing area.
-  // With no area selected, all favorites are shown.
   const visibleStores = useMemo(() => {
     if (!stores) return [];
     if (!selectedAreaId) return stores;
     return stores.filter((s) => s.areaId === selectedAreaId);
   }, [stores, selectedAreaId]);
 
-  if (isLoading || !customerId) {
-    return <LoadingSpinner />;
-  }
-
-  if (isError) {
-    return <ErrorView message="Could not load favorite stores." onRetry={refetch} />;
-  }
-
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={visibleStores}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <StoreCard
-            store={item}
-            onPress={() => router.push(`/(customer)/(home)/store/${item.id}`)}
-          />
-        )}
-        ListEmptyComponent={
-          visibleStores.length === 0 && (stores?.length ?? 0) > 0 ? (
-            <EmptyState
-              title={`No favorites in ${selectedAreaName ?? 'this area'}`}
-              message="Your favorites from other areas are still saved — switch the area to see them."
-              emoji="📍"
-            />
-          ) : (
-            <EmptyState
-              title="No favorite stores"
-              message="Tap the heart on a store to save it here."
-              emoji="❤️"
-            />
-          )
-        }
-        contentContainerStyle={styles.listContent}
+    <AppScreen>
+      <BrandHeader
+        title="المتاجر المفضلة"
+        subtitle="متاجرك المحفوظة للطلب السريع"
+        onBack={() => router.back()}
       />
-    </View>
+
+      {isLoading || !customerId ? (
+        <LoadingState />
+      ) : isError ? (
+        <View style={styles.centerContainer}>
+          <ErrorState
+            title="تعذر التحميل"
+            message="حدث خطأ أثناء جلب المتاجر المفضلة."
+            onRetry={() => void refetch()}
+          />
+        </View>
+      ) : visibleStores.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <EmptyState
+            emoji="🏪"
+            title={
+              (stores?.length ?? 0) > 0
+                ? `لا توجد متاجر مفضلة في ${selectedAreaName ?? 'هذه المنطقة'}`
+                : 'لا توجد متاجر مفضلة بعد'
+            }
+            message={
+              (stores?.length ?? 0) > 0
+                ? 'المفضلة من مناطق أخرى محفوظة — غيّر المنطقة لتراها.'
+                : 'اضغط على القلب بجانب أي متجر لحفظه هنا.'
+            }
+            action={
+              <PrimaryButton
+                title="تصفح المتاجر"
+                icon="basket"
+                onPress={() => router.push('/(customer)/(home)' as never)}
+              />
+            }
+          />
+        </View>
+      ) : (
+        <FlatList
+          data={visibleStores}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <StoreCard
+              store={item}
+              onPress={() => router.push(`/(customer)/(home)/store/${item.id}`)}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   listContent: {
-    padding: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    gap: 12,
+    paddingBottom: 120,
+  },
+  centerContainer: {
+    flex: 1,
+    paddingHorizontal: 18,
+    justifyContent: 'center',
+    paddingBottom: 80,
   },
 });

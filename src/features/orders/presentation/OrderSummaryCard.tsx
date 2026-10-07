@@ -1,11 +1,12 @@
 import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { Order } from '../domain/entities/Order';
 import { OrderStatus } from '../domain/entities/OrderStatus';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
+import { useColors, useTheme } from '@/shared/ui/theme';
+import { Icon } from '@/shared/ui/components/Icon';
 import { formatCurrency, formatDateTime } from '@/shared/utils/formatting';
+import { cardPress, usePressAnimation } from '@/shared/ui/motion';
 
 const TERMINAL_STATUSES: OrderStatus[] = [
   OrderStatus.Delivered,
@@ -14,133 +15,241 @@ const TERMINAL_STATUSES: OrderStatus[] = [
   OrderStatus.Rejected,
 ];
 
+const ARABIC_STATUS_LABELS: Record<string, string> = {
+  pending: 'قيد الانتظار',
+  accepted: 'تم التأكيد',
+  preparing: 'قيد التجهيز',
+  out_for_delivery: 'جاري التوصيل',
+  delivered: 'تم التسليم',
+  cancelled: 'ملغي',
+  expired: 'منتهي الصلاحية',
+  rejected: 'مرفوض',
+};
+
 interface OrderSummaryCardProps {
   order: Order;
   onPress: () => void;
-  /** "Order Again" action for terminal orders (feature 005 US5). */
   onOrderAgain?: () => void;
-  /** "Remove from History" action for terminal orders (feature 005 US6). */
   onHide?: () => void;
 }
 
 /**
- * Compact order card for the customer order history list.
+ * Order card matching SOURCE orders list styling:
+ * RTL Surface card with 20px radius, store name + chevron, order id + Arabic status pill,
+ * item count + formatted total price, and optional terminal actions.
  */
-export function OrderSummaryCard({ order, onPress, onOrderAgain, onHide }: OrderSummaryCardProps) {
+export function OrderSummaryCard({
+  order,
+  onPress,
+  onOrderAgain,
+  onHide,
+}: OrderSummaryCardProps) {
+  const colors = useColors();
+  const { theme } = useTheme();
+  const { onPressIn, onPressOut, animatedStyle } = usePressAnimation(cardPress);
+
   const isTerminal = TERMINAL_STATUSES.includes(order.status);
   const showActions = isTerminal && (onOrderAgain || onHide);
+  const statusLabel = ARABIC_STATUS_LABELS[order.status] ?? order.status;
+
+  const isDelivered = order.status === OrderStatus.Delivered;
+  const isBad =
+    order.status === OrderStatus.Cancelled ||
+    order.status === OrderStatus.Expired ||
+    order.status === OrderStatus.Rejected;
+
+  const statusColor = isDelivered
+    ? colors.secondaryForeground
+    : isBad
+      ? colors.destructive
+      : colors.primaryPressed;
+
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.8}>
-      <View style={styles.topRow}>
-        <Text style={styles.storeName} numberOfLines={1}>
-          {order.storeName}
-        </Text>
-        <Text
-          style={[
-            styles.status,
-            order.status === 'delivered' && styles.statusDelivered,
-            order.status === 'cancelled' && styles.statusBad,
-            order.status === 'rejected' && styles.statusBad,
-            order.status === 'expired' && styles.statusBad,
-          ]}
-        >
-          {order.status.replace(/_/g, ' ')}
-        </Text>
-      </View>
-      <View style={styles.bottomRow}>
-        <Text style={styles.date}>{formatDateTime(order.createdAt)}</Text>
-        <Text style={styles.total}>{formatCurrency(order.totalAmount)}</Text>
-      </View>
-      {showActions ? (
-        <View style={styles.actionRow}>
-          {onOrderAgain ? (
-            <TouchableOpacity style={styles.orderAgainButton} onPress={onOrderAgain} hitSlop={8}>
-              <Text style={styles.orderAgainText}>Order Again</Text>
-            </TouchableOpacity>
-          ) : null}
-          {onHide ? (
-            <TouchableOpacity style={styles.hideButton} onPress={onHide} hitSlop={8}>
-              <Text style={styles.hideText}>Remove from History</Text>
-            </TouchableOpacity>
-          ) : null}
+    <Animated.View style={[styles.wrapper, animatedStyle]}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        accessibilityRole="button"
+        accessibilityLabel={`طلب من ${order.storeName}، الحالة: ${statusLabel}`}
+        testID={`order-${order.id}`}
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+          },
+        ]}
+      >
+        <View style={styles.titleLine}>
+          <Icon name="ChevronLeft" size={18} color={colors.mutedForeground} />
+          <Text
+            style={[
+              styles.storeName,
+              { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
+            ]}
+            numberOfLines={1}
+          >
+            {order.storeName}
+          </Text>
         </View>
-      ) : null}
-    </TouchableOpacity>
+
+        <View style={styles.metaLine}>
+          <Text
+            style={[
+              styles.smallText,
+              { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
+            ]}
+          >
+            {order.id.slice(0, 8)}... · {formatDateTime(order.createdAt)}
+          </Text>
+          <View style={[styles.statusBadge, { backgroundColor: colors.muted }]}>
+            <Text
+              style={[
+                styles.statusText,
+                { color: statusColor, fontFamily: theme.typography.caption.fontFamily },
+              ]}
+            >
+              {statusLabel}
+            </Text>
+          </View>
+        </View>
+
+        <View style={styles.priceLine}>
+          <Text
+            style={[
+              styles.smallText,
+              { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
+            ]}
+          >
+            {order.items.length} منتجات
+          </Text>
+          <Text
+            style={[
+              styles.totalText,
+              { color: colors.foreground, fontFamily: theme.typography.price.fontFamily },
+            ]}
+          >
+            {formatCurrency(order.totalAmount)}
+          </Text>
+        </View>
+
+        {showActions ? (
+          <View style={styles.actionRow}>
+            {onOrderAgain ? (
+              <Pressable
+                style={[styles.actionBtn, { backgroundColor: colors.primary }]}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onOrderAgain();
+                }}
+                hitSlop={8}
+              >
+                <Text style={[styles.actionBtnText, { color: colors.primaryForeground }]}>
+                  اطلب مرة أخرى
+                </Text>
+              </Pressable>
+            ) : null}
+            {onHide ? (
+              <Pressable
+                style={[styles.hideBtn, { borderColor: colors.border }]}
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onHide();
+                }}
+                hitSlop={8}
+              >
+                <Text style={[styles.hideBtnText, { color: colors.mutedForeground }]}>
+                  إخفاء من السجل
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+        ) : null}
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+  wrapper: {
+    marginBottom: 11,
   },
-  topRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  card: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 14,
+    gap: 9,
+  },
+  titleLine: {
+    flexDirection: 'row-reverse',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
   },
   storeName: {
-    ...typography.body,
-    fontWeight: '600',
-    color: colors.textPrimary,
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'right',
     flexShrink: 1,
   },
-  status: {
-    ...typography.caption,
-    fontWeight: '600',
-    color: colors.warning,
-    textTransform: 'capitalize',
-    marginLeft: spacing.sm,
+  metaLine: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  statusDelivered: {
-    color: colors.success,
+  smallText: {
+    fontSize: 11,
+    textAlign: 'right',
   },
-  statusBad: {
-    color: colors.error,
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  priceLine: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 2,
+  },
+  totalText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
   actionRow: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+    flexDirection: 'row-reverse',
+    gap: 8,
+    marginTop: 4,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#eeece5',
+    paddingTop: 8,
   },
-  orderAgainButton: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-    backgroundColor: colors.primary,
-  },
-  orderAgainText: {
-    ...typography.caption,
-    color: colors.white,
-    fontWeight: '600',
-  },
-  hideButton: {
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  hideText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    fontWeight: '600',
-  },
-  bottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  actionBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 10,
     alignItems: 'center',
-    marginTop: spacing.sm,
+    justifyContent: 'center',
   },
-  date: {
-    ...typography.caption,
-    color: colors.textMuted,
-  },
-  total: {
-    ...typography.body,
+  actionBtnText: {
+    fontSize: 11,
     fontWeight: '700',
-    color: colors.textPrimary,
+  },
+  hideBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hideBtnText: {
+    fontSize: 11,
+    fontWeight: '600',
   },
 });

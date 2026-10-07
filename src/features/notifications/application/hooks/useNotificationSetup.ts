@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { Platform } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ExpoNotifications from 'expo-notifications';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
@@ -38,7 +39,10 @@ export function useNotificationSetup(): void {
   }, [router]);
 
   // Cold start: a notification tap that launched the app.
+  // Native-only API — skipped on web where it is unavailable and would
+  // otherwise spam an error overlay on every load.
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     ExpoNotifications.getLastNotificationResponseAsync().then((response) => {
       const url = response?.notification.request.content.data?.url;
       if (typeof url === 'string' && url.startsWith('/(')) {

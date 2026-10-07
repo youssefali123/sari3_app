@@ -3,6 +3,12 @@ import { View } from 'react-native';
 import { Stack } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as ExpoNotifications from 'expo-notifications';
+import {
+  useFonts,
+  Tajawal_400Regular,
+  Tajawal_500Medium,
+  Tajawal_700Bold,
+} from '@expo-google-fonts/tajawal';
 import { AppProviders } from '@/providers/AppProviders';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useNotificationSetup } from '@/features/notifications/application/hooks/useNotificationSetup';
@@ -28,13 +34,29 @@ function RootNavigator() {
   // Tap deep-linking (warm + cold start) and offline registration retries.
   useNotificationSetup();
 
+  // Tajawal font loading (feature 009 T015/T030): splash stays until fonts
+  // resolve; a font error logs and proceeds rather than hanging forever.
+  const [fontsLoaded, fontError] = useFonts({
+    Tajawal_400Regular,
+    Tajawal_500Medium,
+    Tajawal_700Bold,
+  });
+
   useEffect(() => {
-    if (!isLoading) {
+    if (fontError) {
+      console.warn('Tajawal fonts failed to load:', fontError);
+    }
+  }, [fontError]);
+
+  useEffect(() => {
+    if (!isLoading && (fontsLoaded || fontError)) {
       SplashScreen.hideAsync();
     }
-  }, [isLoading]);
+  }, [isLoading, fontsLoaded, fontError]);
 
-  if (isLoading && !authError) {
+  const fontsPending = !fontsLoaded && !fontError;
+
+  if ((isLoading && !authError) || fontsPending) {
     // Splash is still covering the screen; render a blank view beneath it.
     return <View style={{ flex: 1 }} />;
   }

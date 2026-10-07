@@ -1,133 +1,233 @@
 import React from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useDriverAvailability } from '@/features/drivers/application/hooks/useDriverAvailability';
 import { useDriverAreas } from '@/features/drivers/application/hooks/useDriverAreas';
 import { AvailabilityToggle } from '@/features/drivers/presentation/components/AvailabilityToggle';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
+import { useColors } from '@/shared/ui/hooks/useColors';
+import {
+  AppScreen,
+  BrandHeader,
+  PageScroll,
+  PrimaryButton,
+  ProfileRow,
+  Surface,
+} from '@/shared/ui/components';
+import { Icon } from '@/shared/ui/components/Icon';
 
 /**
- * Driver profile: name/info, current availability with the shared
- * AvailabilityToggle, and sign-out (mirrors the customer profile structure).
+ * Driver profile:
+ * Upgraded to SOURCE design language with BrandHeader, Hero Banner,
+ * Surface cards, and clean Arabic copy.
  */
 export default function DriverProfileScreen() {
   const router = useRouter();
+  const colors = useColors();
   const { profile, signOut } = useAuth();
   const { isAvailable } = useDriverAvailability();
   const { areaNames, hasAssignedAreas, isLoading: areasLoading } = useDriverAreas();
-  const workAreaLabel = hasAssignedAreas ? areaNames.join(', ') : 'No areas assigned';
+  const workAreaLabel = hasAssignedAreas ? areaNames.join('، ') : 'لم يتم تعيين نطاقات توصيل بعد';
 
   async function handleSignOut() {
-    try {
-      // Centralized signOut: also purges the TanStack Query cache.
-      await signOut();
-      router.replace('/(auth)/login');
-    } catch (error) {
-      Alert.alert(
-        'Sign out failed',
-        error instanceof Error ? error.message : 'Please try again.',
-      );
-    }
+    Alert.alert(
+      'تسجيل الخروج',
+      'هل أنت متأكد من رغبتك في تسجيل الخروج؟',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'تسجيل الخروج',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              // Centralized signOut: also purges the TanStack Query cache.
+              await signOut();
+              router.replace('/(customer)/(home)');
+            } catch (error) {
+              Alert.alert(
+                'فشل تسجيل الخروج',
+                error instanceof Error ? error.message : 'يرجى المحاولة مرة أخرى.',
+              );
+            }
+          },
+        },
+      ],
+    );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <View style={styles.section}>
-        <Text style={styles.fullName}>{profile?.fullName || 'Driver'}</Text>
-        <Text style={styles.role}>
-          Driver account · Currently{' '}
-          <Text style={isAvailable ? styles.available : styles.offline}>
-            {isAvailable ? 'Available' : 'Offline'}
+    <AppScreen>
+      <BrandHeader title="حسابي" subtitle="ملف كابتن التوصيل" />
+      <PageScroll>
+        {/* Driver Hero Banner */}
+        <View style={[styles.profileHero, { backgroundColor: colors.primary }]}>
+          <View style={styles.profileAvatar}>
+            <Icon name="Bike" size={36} color={colors.foreground} />
+          </View>
+          <Text style={[styles.profileName, { color: colors.foreground }]}>
+            {profile?.fullName || 'كابتن سريع'}
           </Text>
-        </Text>
-        <Text style={styles.workArea}>
-          {areasLoading ? 'Loading work areas…' : `Work area: ${workAreaLabel}`}
-        </Text>
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.toggleRow}>
-          <Text style={styles.toggleLabel}>Availability</Text>
+          <View style={[styles.statusBadge, { backgroundColor: isAvailable ? colors.secondary : 'rgba(255,255,255,0.4)' }]}>
+            <Text style={[styles.statusBadgeText, { color: isAvailable ? colors.secondaryForeground : colors.foreground }]}>
+              {isAvailable ? 'متصل ومستعد للتوصيل' : 'غير متصل حالياً'}
+            </Text>
+          </View>
         </View>
-        <AvailabilityToggle />
-      </View>
 
-      <TouchableOpacity
-        style={styles.signOutButton}
-        onPress={() => void handleSignOut()}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.signOutText}>Sign Out</Text>
-      </TouchableOpacity>
-    </ScrollView>
+        {/* Availability Section */}
+        <Surface style={styles.sectionCard}>
+          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+            حالة استقبال الطلبات
+          </Text>
+          <AvailabilityToggle />
+        </Surface>
+
+        {/* Work Areas Section */}
+        <Surface style={styles.sectionCard}>
+          <View style={styles.areaHeader}>
+            <Icon name="MapPin" size={18} color={colors.secondaryForeground} />
+            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+              نطاقات التوصيل المصرح بها
+            </Text>
+          </View>
+          <Text style={[styles.areaText, { color: colors.mutedForeground }]}>
+            {areasLoading ? 'جاري تحميل مناطق العمل…' : workAreaLabel}
+          </Text>
+        </Surface>
+
+        {/* Switch to customer view */}
+        <Surface style={[styles.switchCard, { backgroundColor: colors.muted }]}>
+          <View style={styles.switchHeader}>
+            <View style={[styles.switchIcon, { backgroundColor: colors.card }]}>
+              <Icon name="User" size={20} color={colors.foreground} />
+            </View>
+            <View style={styles.switchCopy}>
+              <Text style={[styles.switchTitle, { color: colors.foreground }]}>
+                تصفح كعميل
+              </Text>
+              <Text style={[styles.switchSubtitle, { color: colors.mutedForeground }]}>
+                الانتقال إلى واجهة متجر وتجربة طلب الوجبات
+              </Text>
+            </View>
+          </View>
+          <PrimaryButton
+            title="الانتقال إلى وضع العميل"
+            icon="basket"
+            onPress={() => router.replace('/(customer)/(home)' as never)}
+          />
+        </Surface>
+
+        {/* Sign Out Section */}
+        <Surface style={styles.signOutCard}>
+          <ProfileRow
+            icon="trash-outline"
+            title="تسجيل الخروج"
+            detail="الخروج من الحساب بأمان"
+            isDestructive
+            showChevron={false}
+            onPress={() => void handleSignOut()}
+          />
+        </Surface>
+
+        <Text style={[styles.versionText, { color: colors.mutedForeground }]}>
+          سريع · تطبيق كباتن التوصيل · الإصدار 1.0.0
+        </Text>
+      </PageScroll>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    padding: spacing.md,
-    paddingBottom: spacing.xl,
-  },
-  section: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-    marginBottom: spacing.md,
-  },
-  fullName: {
-    ...typography.h2,
-    color: colors.textPrimary,
-    padding: spacing.md,
-    paddingBottom: 0,
-  },
-  role: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    padding: spacing.md,
-    paddingTop: spacing.xs,
-  },
-  workArea: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
-    marginTop: -spacing.sm,
-  },
-  available: {
-    color: colors.success,
-    fontWeight: '600',
-  },
-  offline: {
-    color: colors.error,
-    fontWeight: '600',
-  },
-  toggleRow: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-  },
-  toggleLabel: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-  },
-  signOutButton: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
+  profileHero: {
     alignItems: 'center',
-    marginTop: spacing.lg,
+    paddingVertical: 24,
+    paddingHorizontal: 20,
+    gap: 8,
+    borderRadius: 24,
   },
-  signOutText: {
-    ...typography.body,
-    color: colors.error,
-    fontWeight: '600',
+  profileAvatar: {
+    width: 72,
+    height: 72,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.6)',
+  },
+  profileName: {
+    fontSize: 20,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  sectionCard: {
+    padding: 16,
+    borderRadius: 22,
+    gap: 8,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  areaHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+  areaText: {
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'right',
+  },
+  switchCard: {
+    padding: 18,
+    borderRadius: 22,
+    gap: 14,
+  },
+  switchHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+  },
+  switchIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switchCopy: {
+    flex: 1,
+    alignItems: 'flex-end',
+    gap: 2,
+  },
+  switchTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  switchSubtitle: {
+    fontSize: 12,
+    textAlign: 'right',
+  },
+  signOutCard: {
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 22,
+  },
+  versionText: {
+    fontSize: 11,
+    lineHeight: 18,
+    textAlign: 'center',
+    paddingHorizontal: 12,
+    marginTop: 4,
   },
 });

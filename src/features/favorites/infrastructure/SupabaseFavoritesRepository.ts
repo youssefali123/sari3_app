@@ -13,6 +13,7 @@ interface RestaurantRow {
   address: string | null;
   rating: number | null;
   is_open: boolean | null;
+  category: string | null;
   created_at: string | null;
   area_id: string;
 }
@@ -27,6 +28,7 @@ function mapStore(row: RestaurantRow): Store {
     address: row.address ?? '',
     rating: row.rating,
     isOpen: row.is_open ?? false,
+    category: row.category,
     areaId: row.area_id,
     createdAt: row.created_at ?? '',
   };

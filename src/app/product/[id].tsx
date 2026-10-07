@@ -1,29 +1,38 @@
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  Image,
+  Pressable,
   ScrollView,
   Share,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useQuery } from '@tanstack/react-query';
+
 import { ProductRepository } from '@/features/products/domain/repositories/ProductRepository';
 import { SupabaseProductRepository } from '@/features/products/infrastructure/SupabaseProductRepository';
 import { StoreRepository } from '@/features/restaurants/domain/repositories/StoreRepository';
 import { SupabaseStoreRepository } from '@/features/restaurants/infrastructure/SupabaseStoreRepository';
-import { ProductConfigurator } from '@/features/products/presentation/ProductConfigurator';
 import { FavoriteButton } from '@/features/favorites/presentation/FavoriteButton';
 import { useAddToCart } from '@/features/cart/application/useAddToCart';
 import { CartItem } from '@/features/cart/domain/entities/CartItem';
 import { generateCartItemId } from '@/features/cart/domain/cartUtils';
-import { showAlert } from '@/shared/utils/alert';
-import { LoadingSpinner } from '@/shared/ui/components/LoadingSpinner';
-import { ErrorView } from '@/shared/ui/components/ErrorView';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
+import { StoreConflictModal } from '@/features/cart/presentation/StoreConflictModal';
+import { useColors } from '@/shared/ui/hooks/useColors';
+import { useTheme } from '@/shared/ui/context/ThemeContext';
+import { Icon } from '@/shared/ui/components/Icon';
+import {
+  AppScreen,
+  BrandHeader,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PrimaryButton,
+  SectionTitle,
+  Surface,
+} from '@/shared/ui/components';
 import { formatCurrency } from '@/shared/utils/formatting';
 
 const productRepository: ProductRepository = new SupabaseProductRepository();
@@ -33,17 +42,19 @@ export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const productId = id as string;
   const router = useRouter();
+  const colors = useColors();
+  const { theme } = useTheme();
   const { addItemWithConflictCheck } = useAddToCart();
 
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null);
   const [selectedAddOnIds, setSelectedAddOnIds] = useState<string[]>([]);
   const [quantity, setQuantity] = useState(1);
+  const [isAdding, setIsAdding] = useState(false);
 
   const {
     data: product,
-    isLoading,
+    isLoading: productLoading,
     isError,
-    error,
     refetch,
   } = useQuery({
     queryKey: ['product', productId],
@@ -51,8 +62,6 @@ export default function ProductDetailScreen() {
       try {
         return await productRepository.getProductById(productId);
       } catch (e) {
-        // Directly-addressable route: a deleted product id resolves to a
-        // handled "no longer available" state instead of a crash (FR-009).
         const message = e instanceof Error ? e.message : String(e);
         if (message.includes('PGRST116') || message.includes('No rows')) {
           return null;
@@ -84,16 +93,9 @@ export default function ProductDetailScreen() {
   const store = storeQuery.data;
   const storeIsOpen = store?.isOpen ?? false;
 
-  // All hooks run unconditionally (rules-of-hooks) — early returns happen
-  // only after this block, using the narrowed values below.
-
   const unavailable = product !== null && product !== undefined && !product.isAvailable;
   const variants = useMemo(() => variantsQuery.data ?? [], [variantsQuery.data]);
   const addOns = useMemo(() => addOnsQuery.data ?? [], [addOnsQuery.data]);
-
-  // Effective variant: the user's explicit pick if still valid, otherwise
-  // the first available variant (a variant-product can never be added
-  // without one — carried over from the modal).
   const availableVariants = useMemo(
     () => variants.filter((v) => v.isAvailable),
     [variants],
@@ -105,367 +107,505 @@ export default function ProductDetailScreen() {
     return pick ?? availableVariants[0];
   }, [availableVariants, selectedVariantId]);
 
-  const handleShare = useCallback(() => {
+  const selectedAddOns = useMemo(
+    () => addOns.filter((a) => selectedAddOnIds.includes(a.id)),
+    [addOns, selectedAddOnIds],
+  );
+
+  const unitPrice = useMemo(() => {
+    if (!product) return 0;
+    const base = selectedVariant ? selectedVariant.price : product.price;
+    const addOnsTotal = selectedAddOns.reduce((sum, a) => sum + a.price, 0);
+    return base + addOnsTotal;
+  }, [product, selectedVariant, selectedAddOns]);
+
+  const totalPrice = unitPrice * quantity;
+
+  const handleShare = () => {
     if (!product) return;
-    // Plain-text share (feature 007 FR-004): no deep links — OS share sheet.
     Share.share({
-      message: `${product.name} — ${formatCurrency(product.price)} on Sari3`,
-    }).catch(() => {
-      // Share sheet dismissed or unavailable — no action.
-    });
-  }, [product]);
+      message: `${product.name} — ${formatCurrency(product.price)} على سريع!`,
+    }).catch(() => {});
+  };
 
-  const handleAddToCart = useCallback(() => {
+  const handleAddToCart = async () => {
     if (!product || !store) return;
-    if (unavailable || storeIsOpen !== true) return;
-    const hasVariants = variants.some((v) => v.isAvailable);
-    if (hasVariants && !selectedVariant) return;
+    if (unavailable || !storeIsOpen) return;
+    if (availableVariants.length > 0 && !selectedVariant) return;
 
-    const selectedAddOns = addOns
-      .filter((a) => selectedAddOnIds.includes(a.id))
-      .map((a) => ({ addonId: a.id, name: a.name, unitPrice: a.price }));
+    setIsAdding(true);
+    try {
+      const cartItem: CartItem = {
+        id: generateCartItemId(
+          product.id,
+          selectedVariant?.id ?? null,
+          selectedAddOnIds,
+        ),
+        productId: product.id,
+        productName: product.name,
+        variantId: selectedVariant?.id ?? null,
+        variantName: selectedVariant?.name ?? null,
+        baseUnitPrice: selectedVariant ? selectedVariant.price : product.price,
+        addonIds: selectedAddOnIds.slice().sort(),
+        selectedAddOns: selectedAddOns.map((a) => ({
+          addonId: a.id,
+          name: a.name,
+          unitPrice: a.price,
+        })),
+        quantity,
+        productImageUrl: product.imageUrl,
+      };
 
-    const item: CartItem = {
-      id: generateCartItemId(product.id, selectedVariant?.id ?? null, selectedAddOnIds),
-      productId: product.id,
-      productName: product.name,
-      variantId: selectedVariant?.id ?? null,
-      variantName: selectedVariant?.name ?? null,
-      productImageUrl: product.imageUrl,
-      baseUnitPrice: selectedVariant ? selectedVariant.price : product.price,
-      addonIds: selectedAddOnIds,
-      selectedAddOns,
-      quantity,
-    };
+      addItemWithConflictCheck({
+        item: cartItem,
+        storeId: store.id,
+        storeName: store.name,
+      });
+      router.back();
+    } finally {
+      setIsAdding(false);
+    }
+  };
 
-    addItemWithConflictCheck({
-      item,
-      storeId: store.id,
-      storeName: store.name,
-    });
-    router.push('/(customer)/cart');
-  }, [
-    product,
-    store,
-    storeIsOpen,
-    unavailable,
-    selectedVariant,
-    selectedAddOnIds,
-    quantity,
-    variants,
-    addOns,
-    addItemWithConflictCheck,
-    router,
-  ]);
-
-  // ---- Early returns (all hooks declared above) ----
-
-  if (isLoading) {
-    return <LoadingSpinner />;
-  }
-
-  if (isError) {
+  if (productLoading) {
     return (
-      <ErrorView
-        message={error instanceof Error ? error.message : 'Could not load this product.'}
-        onRetry={refetch}
-      />
+      <AppScreen>
+        <BrandHeader title="جاري التحميل…" onBack={() => router.back()} />
+        <LoadingState />
+      </AppScreen>
     );
   }
 
-  if (product === null || product === undefined) {
-    // Directly-addressable route: a deleted product id resolves to a handled
-    // "no longer available" state instead of a crash (FR-009).
+  if (isError || !product) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.unavailableEmoji}>🍽️</Text>
-        <Text style={styles.unavailableTitle}>This item is no longer available</Text>
-        <Text style={styles.unavailableBody}>
-          It may have been removed from the menu. Go back and browse for something else.
-        </Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.8}>
-          <Text style={styles.backButtonText}>Go back</Text>
-        </TouchableOpacity>
-      </View>
+      <AppScreen>
+        <BrandHeader title="المنتج غير متاح" onBack={() => router.back()} />
+        <View style={styles.centerContainer}>
+          <EmptyState
+            emoji="🍽️"
+            title="المنتج غير متاح"
+            message="يبدو أن هذا الصنف غير متوفر حالياً في قائمة المتجر."
+            action={
+              <PrimaryButton
+                title="الرجوع للقائمة"
+                icon="arrow-back"
+                onPress={() => router.back()}
+              />
+            }
+          />
+        </View>
+      </AppScreen>
     );
   }
 
-  // Narrowed: product is guaranteed non-null from here on.
-  const currentProduct = product;
-  const selectedAddOnsTotal = addOns
-    .filter((a) => selectedAddOnIds.includes(a.id))
-    .reduce((sum, a) => sum + a.price, 0);
-  const base = selectedVariant ? selectedVariant.price : currentProduct.price;
-  const totalPrice = (base + selectedAddOnsTotal) * quantity;
-
-  const addToCartDisabled =
-    unavailable || storeIsOpen !== true || (variants.some((v) => v.isAvailable) && !selectedVariant);
-
-  const addToCartDisabledReason = unavailable
-    ? 'This item is currently unavailable.'
-    : storeIsOpen !== true
-      ? `${store?.name ?? 'This store'} is closed — ordering is unavailable.`
-      : variants.some((v) => v.isAvailable) && !selectedVariant
-        ? 'Select a size first.'
-        : null;
+  const hasVariants = availableVariants.length > 0;
+  const availableAddOns = addOns.filter((a) => a.isAvailable);
 
   return (
-    <View style={styles.screen}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-        <View style={styles.topBar}>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => router.back()}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.backIcon}>←</Text>
-          </TouchableOpacity>
-          <View style={styles.topBarSpacer} />
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => void handleShare()}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.shareIcon}>↗</Text>
-          </TouchableOpacity>
-        </View>
-
-        {currentProduct.imageUrl ? (
-          <View style={styles.imageWrapper}>
-            <FavoriteButton kind="product" targetId={currentProduct.id} />
+    <AppScreen>
+      <BrandHeader
+        title={store?.name ?? 'تفاصيل المنتج'}
+        subtitle={product.name}
+        onBack={() => router.back()}
+        trailing={
+          <View style={styles.headerActions}>
+            <View style={styles.favBtnWrap}>
+              <FavoriteButton kind="product" targetId={product.id} activeColor={colors.primary} />
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="مشاركة المنتج"
+              onPress={handleShare}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.shareBtn,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.75 : 1,
+                  transform: [{ scale: pressed ? 0.94 : 1 }],
+                },
+              ]}
+            >
+              <Icon name="Share2" size={18} color={colors.foreground} />
+            </Pressable>
           </View>
-        ) : null}
+        }
+      />
 
-        <View style={styles.header}>
-          <Text style={styles.name}>{currentProduct.name}</Text>
-          <Text style={styles.price}>{formatCurrency(base)}</Text>
-          {currentProduct.description ? (
-            <Text style={styles.description}>{currentProduct.description}</Text>
-          ) : null}
-          {unavailable ? (
-            <Text style={styles.unavailableNote}>This item is currently unavailable.</Text>
-          ) : null}
-          {store && storeIsOpen !== true ? (
-            <Text style={styles.unavailableNote}>
-              {store.name} is closed — ordering is unavailable right now.
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.contentContainer}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Product Hero Image */}
+        {product.imageUrl ? (
+          <Image source={{ uri: product.imageUrl }} style={styles.heroImage} />
+        ) : (
+          <View style={[styles.heroImage, styles.heroPlaceholder, { backgroundColor: colors.muted }]}>
+            <Icon name="Utensils" size={54} color={colors.mutedForeground} />
+          </View>
+        )}
+
+        {/* Product Info Card */}
+        <Surface style={styles.infoCard}>
+          <Text
+            style={[
+              styles.productTitle,
+              { color: colors.foreground, fontFamily: theme.typography.headingMedium.fontFamily },
+            ]}
+          >
+            {product.name}
+          </Text>
+
+          {product.description ? (
+            <Text style={[styles.productDescription, { color: colors.mutedForeground }]}>
+              {product.description}
             </Text>
           ) : null}
-        </View>
 
-        <View style={styles.configuratorCard}>
-          <ProductConfigurator
-            product={currentProduct}
-            variants={variants}
-            addOns={addOns}
-            selectedVariantId={selectedVariantId}
-            onSelectVariant={setSelectedVariantId}
-            selectedAddOnIds={selectedAddOnIds}
-            onToggleAddOn={(addonId) =>
-              setSelectedAddOnIds((current) =>
-                current.includes(addonId)
-                  ? current.filter((id) => id !== addonId)
-                  : [...current, addonId],
-              )
+          <View style={styles.priceRow}>
+            <Text style={[styles.productPrice, { color: colors.foreground }]}>
+              {formatCurrency(unitPrice)}
+            </Text>
+            {unavailable && (
+              <View style={[styles.unavailableBadge, { backgroundColor: colors.destructive + '15' }]}>
+                <Text style={[styles.unavailableText, { color: colors.destructive }]}>
+                  غير متوفر حالياً
+                </Text>
+              </View>
+            )}
+          </View>
+        </Surface>
+
+        {/* Variants Selection (e.g. Sizes) */}
+        {hasVariants && (
+          <Surface style={styles.optionsCard}>
+            <SectionTitle title="الحجم / الخيارات" />
+            <View style={styles.optionsList}>
+              {availableVariants.map((variant) => {
+                const isSelected = selectedVariant?.id === variant.id;
+                return (
+                  <Pressable
+                    key={variant.id}
+                    onPress={() => setSelectedVariantId(variant.id)}
+                    style={({ pressed }) => [
+                      styles.optionRow,
+                      { borderBottomColor: colors.border, opacity: pressed ? 0.75 : 1 },
+                    ]}
+                  >
+                    <View style={styles.optionCheckRow}>
+                      <View
+                        style={[
+                          styles.radioCircle,
+                          {
+                            borderColor: isSelected ? colors.primary : colors.mutedForeground,
+                            backgroundColor: isSelected ? colors.primary : 'transparent',
+                          },
+                        ]}
+                      >
+                        {isSelected && <View style={styles.radioDot} />}
+                      </View>
+                      <Text
+                        style={[
+                          styles.optionName,
+                          {
+                            color: colors.foreground,
+                            fontWeight: isSelected ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {variant.name}
+                      </Text>
+                    </View>
+                    <Text style={[styles.optionPrice, { color: colors.foreground }]}>
+                      {formatCurrency(variant.price)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Surface>
+        )}
+
+        {/* Add-ons Selection */}
+        {availableAddOns.length > 0 && (
+          <Surface style={styles.optionsCard}>
+            <SectionTitle title="الإضافات الاختيارية" />
+            <View style={styles.optionsList}>
+              {availableAddOns.map((addOn) => {
+                const isChecked = selectedAddOnIds.includes(addOn.id);
+                return (
+                  <Pressable
+                    key={addOn.id}
+                    onPress={() => {
+                      setSelectedAddOnIds((prev) =>
+                        isChecked ? prev.filter((id) => id !== addOn.id) : [...prev, addOn.id],
+                      );
+                    }}
+                    style={({ pressed }) => [
+                      styles.optionRow,
+                      { borderBottomColor: colors.border, opacity: pressed ? 0.75 : 1 },
+                    ]}
+                  >
+                    <View style={styles.optionCheckRow}>
+                      <View
+                        style={[
+                          styles.checkboxBox,
+                          {
+                            borderColor: isChecked ? colors.primary : colors.border,
+                            backgroundColor: isChecked ? colors.primary : colors.card,
+                          },
+                        ]}
+                      >
+                        {isChecked && (
+                          <Icon name="Check" size={14} color={colors.primaryForeground} strokeWidth={3} />
+                        )}
+                      </View>
+                      <Text
+                        style={[
+                          styles.optionName,
+                          {
+                            color: colors.foreground,
+                            fontWeight: isChecked ? '700' : '500',
+                          },
+                        ]}
+                      >
+                        {addOn.name}
+                      </Text>
+                    </View>
+                    <Text style={[styles.optionPrice, { color: colors.mutedForeground }]}>
+                      + {formatCurrency(addOn.price)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </Surface>
+        )}
+
+        {/* Quantity Stepper */}
+        <Surface style={styles.quantityCard}>
+          <Text style={[styles.quantityTitle, { color: colors.foreground }]}>الكمية</Text>
+          <View style={styles.quantityControls}>
+            <Pressable
+              onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+              disabled={quantity <= 1}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.stepBtn,
+                {
+                  backgroundColor: colors.muted,
+                  borderColor: colors.border,
+                  opacity: quantity <= 1 ? 0.4 : pressed ? 0.7 : 1,
+                  transform: [{ scale: pressed ? 0.92 : 1 }],
+                },
+              ]}
+            >
+              <Icon name="Minus" size={18} color={colors.foreground} />
+            </Pressable>
+
+            <Text style={[styles.quantityNumber, { color: colors.foreground }]}>
+              {quantity}
+            </Text>
+
+            <Pressable
+              onPress={() => setQuantity((q) => q + 1)}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.stepBtn,
+                {
+                  backgroundColor: colors.muted,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.7 : 1,
+                  transform: [{ scale: pressed ? 0.92 : 1 }],
+                },
+              ]}
+            >
+              <Icon name="Plus" size={18} color={colors.foreground} />
+            </Pressable>
+          </View>
+        </Surface>
+
+        {/* Add to Cart CTA */}
+        <View style={styles.ctaWrapper}>
+          <PrimaryButton
+            title={
+              unavailable
+                ? 'المنتج غير متاح حالياً'
+                : !storeIsOpen
+                ? 'المتجر مغلق حالياً'
+                : `أضف إلى السلة · ${formatCurrency(totalPrice)}`
             }
-            quantity={quantity}
-            onQuantityChange={setQuantity}
+            icon="bag"
+            disabled={unavailable || !storeIsOpen}
+            loading={isAdding}
+            onPress={() => void handleAddToCart()}
           />
         </View>
       </ScrollView>
 
-      <View style={styles.stickyBar}>
-        <View style={styles.stickyTotal}>
-          <Text style={styles.stickyTotalLabel}>Total</Text>
-          <Text style={styles.stickyTotalValue}>{formatCurrency(totalPrice)}</Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.addToCartButton, (addToCartDisabled || quantity < 1) && styles.buttonDisabled]}
-          onPress={() => {
-            if (addToCartDisabled) {
-              showAlert(
-                'Cannot add to cart',
-                addToCartDisabledReason ?? 'Please try again.',
-              );
-              return;
-            }
-            handleAddToCart();
-          }}
-          disabled={addToCartDisabled}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.addToCartText}>Add to Cart</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+      {/* Cross-store conflict modal */}
+      <StoreConflictModal />
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
+  centerContainer: {
     flex: 1,
-    backgroundColor: colors.background,
+    paddingHorizontal: 18,
+    justifyContent: 'center',
   },
-  container: {
-    flex: 1,
+  contentContainer: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 40,
+    gap: 16,
   },
-  content: {
-    paddingBottom: spacing.xl + 80,
+  headerActions: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
   },
-  imageWrapper: {
-    position: 'relative',
-  },
-  topBar: {
-    position: 'absolute',
-    top: spacing.sm,
-    left: spacing.md,
-    right: spacing.md,
-    flexDirection: 'row',
-    zIndex: 10,
-  },
-  topBarSpacer: {
-    flex: 1,
-  },
-  iconButton: {
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surface,
+  favBtnWrap: {
+    width: 38,
+    height: 38,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
   },
-  backIcon: {
-    fontSize: 18,
-    color: colors.textPrimary,
+  shareBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 13,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  heroImage: {
+    width: '100%',
+    height: 230,
+    borderRadius: 24,
+  },
+  heroPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoCard: {
+    padding: 18,
+    borderRadius: 22,
+    gap: 8,
+  },
+  productTitle: {
+    fontSize: 22,
+    fontWeight: '800',
+    textAlign: 'right',
+  },
+  productDescription: {
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'right',
+  },
+  priceRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 4,
+  },
+  productPrice: {
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  unavailableBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  unavailableText: {
+    fontSize: 11,
     fontWeight: '700',
   },
-  shareButton: {
-    position: 'absolute',
-    top: spacing.sm,
-    right: spacing.md,
-    width: 36,
-    height: 36,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.surface,
+  optionsCard: {
+    padding: 16,
+    borderRadius: 22,
+    gap: 10,
+  },
+  optionsList: {
+    gap: 2,
+  },
+  optionRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  optionCheckRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+  },
+  radioCircle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
   },
-  shareIcon: {
-    fontSize: 16,
-    color: colors.textPrimary,
+  radioDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#1a1915',
   },
-  header: {
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    marginBottom: spacing.md,
-  },
-  name: {
-    ...typography.h2,
-    color: colors.textPrimary,
-  },
-  price: {
-    ...typography.h3,
-    color: colors.primary,
-    marginTop: spacing.xs,
-  },
-  description: {
-    ...typography.body,
-    color: colors.textSecondary,
-    marginTop: spacing.sm,
-  },
-  unavailableNote: {
-    ...typography.bodySmall,
-    color: colors.error,
-    marginTop: spacing.sm,
-  },
-  configuratorCard: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.md,
-  },
-  centered: {
-    flex: 1,
+  checkboxBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 7,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.lg,
-    backgroundColor: colors.background,
   },
-  unavailableEmoji: {
-    fontSize: 48,
-    marginBottom: spacing.md,
+  optionName: {
+    fontSize: 14,
   },
-  unavailableTitle: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    textAlign: 'center',
-    marginBottom: spacing.sm,
-  },
-  unavailableBody: {
-    ...typography.body,
-    color: colors.textSecondary,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  backButton: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.primary,
-  },
-  backButtonText: {
-    ...typography.body,
-    color: colors.white,
+  optionPrice: {
+    fontSize: 13,
     fontWeight: '600',
   },
-  stickyBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
+  quantityCard: {
+    flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    padding: spacing.md,
-    gap: spacing.md,
+    justifyContent: 'space-between',
+    padding: 16,
+    borderRadius: 20,
   },
-  stickyTotal: {
-    flex: 1,
-  },
-  stickyTotalLabel: {
-    ...typography.caption,
-    color: colors.textMuted,
-  },
-  stickyTotalValue: {
-    ...typography.h3,
-    color: colors.textPrimary,
+  quantityTitle: {
+    fontSize: 15,
     fontWeight: '700',
   },
-  addToCartButton: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.lg,
+  quantityControls: {
+    flexDirection: 'row-reverse',
     alignItems: 'center',
+    gap: 16,
   },
-  buttonDisabled: {
-    opacity: 0.5,
+  stepBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  addToCartText: {
-    ...typography.body,
-    color: colors.white,
-    fontWeight: '700',
+  quantityNumber: {
+    fontSize: 17,
+    fontWeight: '800',
+    minWidth: 24,
+    textAlign: 'center',
+  },
+  ctaWrapper: {
+    marginTop: 6,
+    marginBottom: 20,
   },
 });

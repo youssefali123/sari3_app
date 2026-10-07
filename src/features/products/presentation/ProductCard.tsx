@@ -1,138 +1,184 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { Product } from '../domain/entities/Product';
 import { FavoriteButton } from '../../favorites/presentation/FavoriteButton';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
 import { formatCurrency } from '@/shared/utils/formatting';
+import { cardPress, usePressAnimation } from '@/shared/ui/motion';
+import { useColors } from '@/shared/ui/theme';
+import { useTheme } from '@/shared/ui/context/ThemeContext';
+import { Icon } from '@/shared/ui/components/Icon';
 
 interface ProductCardProps {
   product: Product;
   storeIsOpen: boolean;
   onPress: () => void;
+  onQuickAdd?: () => void;
 }
 
 /**
- * Catalog product card. The add button is disabled when the store is closed
- * (BR-001, FR-024) — browsing remains available.
+ * Catalog product card matching the SOURCE design language:
+ * RTL layout, rounded 20px card, 80x80 image, bold title, formatted price,
+ * favorite heart button, and quick-add button.
  */
-export function ProductCard({ product, storeIsOpen, onPress }: ProductCardProps) {
+export function ProductCard({ product, storeIsOpen, onPress, onQuickAdd }: ProductCardProps) {
+  const colors = useColors();
+  const { theme } = useTheme();
+  const { onPressIn, onPressOut, animatedStyle } = usePressAnimation(cardPress);
+
   return (
-    <TouchableOpacity
-      style={styles.card}
-      onPress={onPress}
-      disabled={!storeIsOpen || !product.isAvailable}
-      activeOpacity={0.8}
-    >
-      {product.imageUrl ? (
-        <Image source={{ uri: product.imageUrl }} style={styles.image} />
-      ) : (
-        <View style={[styles.image, styles.imagePlaceholder]}>
-          <Text style={styles.imagePlaceholderText}>{product.name.charAt(0)}</Text>
-        </View>
-      )}
-      <View style={styles.info}>
-        <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>
-            {product.name}
-          </Text>
-          <FavoriteButton kind="product" targetId={product.id} />
-        </View>
-        {product.description ? (
-          <Text style={styles.description} numberOfLines={2}>
-            {product.description}
-          </Text>
-        ) : null}
-        <View style={styles.bottomRow}>
-          <Text style={styles.price}>{formatCurrency(product.price)}</Text>
-          <View
-            style={[
-              styles.addButton,
-              (!storeIsOpen || !product.isAvailable) && styles.addButtonDisabled,
-            ]}
-          >
-            <Text style={styles.addButtonText}>+</Text>
+    <Animated.View style={[styles.wrapper, animatedStyle]}>
+      <Pressable
+        onPress={onPress}
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        disabled={!storeIsOpen || !product.isAvailable}
+        accessibilityRole="button"
+        accessibilityLabel={`${product.name}، ${formatCurrency(product.price)}`}
+        style={[
+          styles.card,
+          {
+            backgroundColor: colors.card,
+            borderColor: colors.border,
+            opacity: (!storeIsOpen || !product.isAvailable) ? 0.6 : 1,
+          },
+        ]}
+      >
+        <View style={styles.imageWrap}>
+          {product.imageUrl ? (
+            <Image source={{ uri: product.imageUrl }} style={styles.image} resizeMode="cover" />
+          ) : (
+            <View
+              style={[
+                styles.image,
+                styles.imagePlaceholder,
+                { backgroundColor: colors.muted },
+              ]}
+            >
+              <Icon name="Utensils" size={24} color={colors.mutedForeground} />
+            </View>
+          )}
+          <View style={styles.favoriteWrap} pointerEvents="box-none">
+            <FavoriteButton kind="product" targetId={product.id} overlay />
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
+
+        <View style={styles.copy}>
+          <Text
+            style={[
+              styles.name,
+              { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
+            ]}
+            numberOfLines={1}
+          >
+            {product.name}
+          </Text>
+
+          {product.description ? (
+            <Text
+              numberOfLines={2}
+              style={[
+                styles.description,
+                { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
+              ]}
+            >
+              {product.description}
+            </Text>
+          ) : null}
+
+          <View style={styles.bottomRow}>
+            <Text
+              style={[
+                styles.price,
+                { color: colors.foreground, fontFamily: theme.typography.price.fontFamily },
+              ]}
+            >
+              {formatCurrency(product.price)}
+            </Text>
+
+            {onQuickAdd && storeIsOpen && product.isAvailable ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onQuickAdd();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`أضف ${product.name} إلى السلة`}
+                hitSlop={8}
+                style={[styles.addButton, { backgroundColor: colors.primary }]}
+              >
+                <Icon name="Plus" size={17} color={colors.primaryForeground} strokeWidth={2.5} />
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    marginBottom: 11,
+  },
   card: {
-    flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-    marginBottom: spacing.md,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
+    minHeight: 105,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 10,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 11,
+  },
+  imageWrap: {
+    position: 'relative',
   },
   image: {
-    width: 84,
-    height: 84,
-    backgroundColor: colors.border,
+    width: 80,
+    height: 80,
+    borderRadius: 16,
   },
   imagePlaceholder: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  imagePlaceholderText: {
-    ...typography.h3,
-    color: colors.textMuted,
+  favoriteWrap: {
+    position: 'absolute',
+    top: 4,
+    left: 4,
+    borderRadius: 14,
   },
-  info: {
+  copy: {
     flex: 1,
-    padding: spacing.sm + 4,
-    justifyContent: 'space-between',
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    gap: 4,
+    alignItems: 'stretch',
   },
   name: {
-    ...typography.body,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    flexShrink: 1,
+    fontSize: 14,
+    fontWeight: '700',
+    textAlign: 'right',
   },
   description: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: 2,
+    fontSize: 11,
+    lineHeight: 17,
+    textAlign: 'right',
   },
   bottomRow: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: spacing.xs,
+    marginTop: 2,
   },
   price: {
-    ...typography.body,
+    fontSize: 13,
     fontWeight: '700',
-    color: colors.textPrimary,
+    textAlign: 'right',
   },
   addButton: {
     width: 32,
     height: 32,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.primary,
+    borderRadius: 11,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  addButtonDisabled: {
-    backgroundColor: colors.disabled,
-  },
-  addButtonText: {
-    color: colors.white,
-    fontSize: 20,
-    fontWeight: '700',
-    lineHeight: 24,
   },
 });

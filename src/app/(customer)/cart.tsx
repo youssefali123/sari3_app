@@ -12,40 +12,71 @@ import {
   updateQuantity,
 } from '@/features/cart/application/cartSlice';
 import { useAppDispatch, useAppSelector } from '@/shared/lib/store';
-import { Button } from '@/shared/ui/components/Button';
-import { EmptyState } from '@/shared/ui/components/EmptyState';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
-import { formatCurrency } from '@/shared/utils/formatting';
+import { useColors, useTheme } from '@/shared/ui/theme';
+import { AppHeader } from '@/shared/ui/components/AppHeader';
+import { EmptyState } from '@/shared/ui/components/AppUI';
+import { PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
+import { StickyBar } from '@/shared/ui/components/StickyBar';
+import { formatCurrencyCompact } from '@/shared/utils/formatting';
 
 export default function CartScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { user } = useAuth();
+  const { theme } = useTheme();
+  const colors = useColors();
+  const styles = createStyles(theme);
   const items = useAppSelector(selectCartItems);
   const storeName = useAppSelector(selectCartStoreName);
   const subtotal = useAppSelector(selectCartSubtotal);
 
+  const proceedToCheckout = () => {
+    if (!user) {
+      router.push({
+        pathname: '/(auth)/login',
+        params: { returnTo: '/(customer)/checkout' },
+      });
+      return;
+    }
+    router.push('/(customer)/checkout');
+  };
+
   if (items.length === 0) {
     return (
-      <View style={styles.container}>
-        <EmptyState
-          title="Your cart is empty"
-          message="Browse stores and add items to get started."
-          emoji="🛒"
-        />
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <AppHeader title="سلة الطلبات" subtitle="راجع طلبك قبل التأكيد" />
+        <View style={styles.emptyContainer}>
+          <EmptyState
+            title="سلتك فارغة"
+            message="اختر وجبتك المفضلة من المطاعم القريبة."
+            icon="bag-handle-outline"
+          />
+          <View style={styles.browseButtonWrap}>
+            <PrimaryButton
+              title="تصفح المتاجر"
+              icon="basket-outline"
+              onPress={() => router.push('/')}
+            />
+          </View>
+        </View>
       </View>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppHeader title="سلة الطلبات" subtitle="راجع طلبك قبل التأكيد" />
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
         ListHeaderComponent={
-          storeName ? <Text style={styles.storeName}>Ordering from {storeName}</Text> : null
+          storeName ? (
+            <Text style={[styles.storeLine, { color: colors.mutedForeground }]} numberOfLines={1}>
+              الطلب من متجر {storeName}
+            </Text>
+          ) : null
         }
         renderItem={({ item }) => (
           <CartItemRow
@@ -57,66 +88,104 @@ export default function CartScreen() {
           />
         )}
         ListFooterComponent={
-          <View style={styles.footer}>
-            <View style={styles.subtotalRow}>
-              <Text style={styles.subtotalLabel}>Subtotal</Text>
-              <Text style={styles.subtotalValue}>{formatCurrency(subtotal)}</Text>
+          <Surface style={styles.totalsCard}>
+            <View style={styles.totalRow}>
+              <Text style={[styles.totalLabel, { color: colors.mutedForeground }]}>
+                قيمة الطلب
+              </Text>
+              <Text style={[styles.totalValue, { color: colors.foreground }]}>
+                {formatCurrencyCompact(subtotal)}
+              </Text>
             </View>
-            <Button
-              title="Proceed to Checkout"
-              onPress={() => {
-                // Protected action (FR-003): guests are captured with a
-                // returnTo param; the guest cart is never touched.
-                if (!user) {
-                  router.push({
-                    pathname: '/(auth)/login',
-                    params: { returnTo: '/(customer)/checkout' },
-                  });
-                  return;
-                }
-                router.push('/(customer)/checkout');
-              }}
-            />
-          </View>
+            <View style={[styles.summaryDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.totalRow}>
+              <Text style={[styles.grandTotalLabel, { color: colors.foreground }]}>
+                الإجمالي
+              </Text>
+              <Text style={[styles.grandTotalValue, { color: colors.foreground }]}>
+                {formatCurrencyCompact(subtotal)}
+              </Text>
+            </View>
+            <Text style={[styles.deliveryNote, { color: colors.mutedForeground }]}>
+              رسوم التوصيل تُحسب عند تأكيد العنوان
+            </Text>
+          </Surface>
         }
-        contentContainerStyle={styles.listContent}
       />
+
+      <StickyBar>
+        <PrimaryButton
+          title={`متابعة الطلب · ${formatCurrencyCompact(subtotal)}`}
+          icon="checkmark-circle-outline"
+          onPress={proceedToCheckout}
+          testID="proceed-to-checkout"
+        />
+      </StickyBar>
+
       <StoreConflictModal />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  listContent: {
-    padding: spacing.md,
-    paddingBottom: spacing.xl,
-  },
-  storeName: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
-  },
-  footer: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-  },
-  subtotalRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  subtotalLabel: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  subtotalValue: {
-    ...typography.h3,
-    color: colors.textPrimary,
-  },
-});
+const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    emptyContainer: {
+      flex: 1,
+      padding: 18,
+      justifyContent: 'center',
+      gap: 16,
+    },
+    browseButtonWrap: {
+      alignSelf: 'stretch',
+    },
+    listContent: {
+      paddingHorizontal: 18,
+      paddingTop: 8,
+      paddingBottom: 130,
+      gap: 11,
+    },
+    storeLine: {
+      fontSize: 13,
+      fontWeight: '700',
+      textAlign: 'right',
+      marginBottom: 4,
+    },
+    totalsCard: {
+      gap: 10,
+      marginTop: 8,
+    },
+    totalRow: {
+      flexDirection: 'row-reverse',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    summaryDivider: {
+      height: StyleSheet.hairlineWidth,
+      marginVertical: 2,
+    },
+    totalLabel: {
+      fontSize: 13,
+      textAlign: 'right',
+    },
+    totalValue: {
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    grandTotalLabel: {
+      fontSize: 16,
+      fontWeight: '800',
+      textAlign: 'right',
+    },
+    grandTotalValue: {
+      fontSize: 17,
+      fontWeight: '800',
+    },
+    deliveryNote: {
+      fontSize: 11,
+      textAlign: 'center',
+      marginTop: 4,
+    },
+  });

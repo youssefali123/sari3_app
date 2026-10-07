@@ -10,11 +10,14 @@ import { SupabaseStoreRepository } from '@/features/restaurants/infrastructure/S
 import { useSelectedArea } from '@/features/areas/application/hooks/useSelectedArea';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
-import { LoadingSpinner } from '@/shared/ui/components/LoadingSpinner';
-import { ErrorView } from '@/shared/ui/components/ErrorView';
-import { EmptyState } from '@/shared/ui/components/EmptyState';
-import { colors } from '@/shared/ui/theme/colors';
-import { spacing } from '@/shared/ui/theme/spacing';
+import {
+  AppScreen,
+  BrandHeader,
+  EmptyState,
+  ErrorState,
+  LoadingState,
+  PrimaryButton,
+} from '@/shared/ui/components';
 
 const favoritesRepository: FavoritesRepository = new SupabaseFavoritesRepository();
 const storeRepository: StoreRepository = new SupabaseStoreRepository();
@@ -36,8 +39,7 @@ export default function FavoriteProductsScreen() {
     enabled: Boolean(customerId),
   });
 
-  // Feature 006: products are scoped by their STORE's area. A storeId →
-  // areaId map resolves each favorite product's region client-side.
+  // Feature 006: products are scoped by their STORE's area.
   const { data: stores } = useQuery({
     queryKey: ['stores', 'areaMap'],
     queryFn: () => storeRepository.getStores(),
@@ -50,54 +52,76 @@ export default function FavoriteProductsScreen() {
     return products.filter((p) => areaByStore.get(p.storeId) === selectedAreaId);
   }, [products, stores, selectedAreaId]);
 
-  if (isLoading || !customerId) {
-    return <LoadingSpinner />;
-  }
-
-  if (isError) {
-    return <ErrorView message="Could not load favorite products." onRetry={refetch} />;
-  }
-
   return (
-    <View style={styles.container}>
-      <FlatList
-        data={visibleProducts}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <ProductCard
-            product={item}
-            storeIsOpen
-            onPress={() => router.push(`/product/${item.id}`)}
-          />
-        )}
-        ListEmptyComponent={
-          visibleProducts.length === 0 && (products?.length ?? 0) > 0 ? (
-            <EmptyState
-              title={`No favorites in ${selectedAreaName ?? 'this area'}`}
-              message="Your favorites from other areas are still saved — switch the area to see them."
-              emoji="📍"
-            />
-          ) : (
-            <EmptyState
-              title="No favorite products"
-              message="Tap the heart on a product to save it here."
-              emoji="❤️"
-            />
-          )
-        }
-        contentContainerStyle={styles.listContent}
+    <AppScreen>
+      <BrandHeader
+        title="المنتجات المفضلة"
+        subtitle="منتجاتك المحفوظة للطلب السريع"
+        onBack={() => router.back()}
       />
-    </View>
+
+      {isLoading || !customerId ? (
+        <LoadingState />
+      ) : isError ? (
+        <View style={styles.centerContainer}>
+          <ErrorState
+            title="تعذر التحميل"
+            message="حدث خطأ أثناء جلب المنتجات المفضلة."
+            onRetry={() => void refetch()}
+          />
+        </View>
+      ) : visibleProducts.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <EmptyState
+            emoji="🛍️"
+            title={
+              (products?.length ?? 0) > 0
+                ? `لا توجد منتجات مفضلة في ${selectedAreaName ?? 'هذه المنطقة'}`
+                : 'لا توجد منتجات مفضلة بعد'
+            }
+            message={
+              (products?.length ?? 0) > 0
+                ? 'المفضلة من مناطق أخرى محفوظة — غيّر المنطقة لتراها.'
+                : 'اضغط على القلب بجانب أي منتج لحفظه هنا.'
+            }
+            action={
+              <PrimaryButton
+                title="تصفح المنتجات"
+                icon="basket"
+                onPress={() => router.push('/(customer)/(home)' as never)}
+              />
+            }
+          />
+        </View>
+      ) : (
+        <FlatList
+          data={visibleProducts}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <ProductCard
+              product={item}
+              storeIsOpen
+              onPress={() => router.push(`/product/${item.id}`)}
+            />
+          )}
+          contentContainerStyle={styles.listContent}
+        />
+      )}
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
   listContent: {
-    padding: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    gap: 12,
+    paddingBottom: 120,
+  },
+  centerContainer: {
+    flex: 1,
+    paddingHorizontal: 18,
+    justifyContent: 'center',
+    paddingBottom: 80,
   },
 });

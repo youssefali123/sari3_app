@@ -11,6 +11,17 @@ export function formatCurrency(amount: MoneyAmount): string {
 }
 
 /**
+ * Compact Arabic format for tight surfaces (sticky bars, badges).
+ * 15000 → "150 ج" · 16550 → "165.5 ج" (fractions kept only when they exist).
+ */
+export function formatCurrencyCompact(amount: MoneyAmount): string {
+  const piasters = Math.max(0, Math.round(amount));
+  const pounds = piasters / 100;
+  const text = Number.isInteger(pounds) ? String(pounds) : pounds.toFixed(2);
+  return `${text} ج`;
+}
+
+/**
  * Formats an ISO date string to a readable date.
  */
 export function formatDate(isoString: string): string {

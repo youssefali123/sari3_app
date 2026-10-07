@@ -1,41 +1,70 @@
 import React from 'react';
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
+import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useColors } from '@/shared/ui/theme';
+import { useTheme } from '@/shared/ui/context/ThemeContext';
+import { Icon } from '@/shared/ui/components/Icon';
 
 interface SearchBarProps {
   value: string;
   onChangeText: (text: string) => void;
   placeholder?: string;
+  testID?: string;
 }
 
 /**
- * Controlled search input with a magnifier icon and a clear (✕) button
- * (feature 008 US1).
+ * SearchBar matching SOURCE design language:
+ * 48px height, 15px radius, 1px border, RTL alignment, Lucide Search icon,
+ * and circular clear button.
  */
-export function SearchBar({ value, onChangeText, placeholder = 'Search stores and products…' }: SearchBarProps) {
+export function SearchBar({
+  value,
+  onChangeText,
+  placeholder = 'ابحث عن مطعم أو منتج...',
+  testID = 'venue-search',
+}: SearchBarProps) {
+  const colors = useColors();
+  const { theme } = useTheme();
+
   return (
-    <View style={styles.container}>
-      <Text style={styles.searchIcon}>🔍</Text>
+    <View
+      style={[
+        styles.container,
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+        },
+      ]}
+    >
+      <Icon name="Search" size={19} color={colors.mutedForeground} />
       <TextInput
-        style={styles.input}
+        accessibilityLabel={placeholder}
+        style={[
+          styles.input,
+          {
+            color: colors.foreground,
+            fontFamily: theme.typography.bodyMedium.fontFamily,
+          },
+        ]}
         value={value}
         onChangeText={onChangeText}
         placeholder={placeholder}
-        placeholderTextColor={colors.textMuted}
+        placeholderTextColor={colors.mutedForeground}
         autoCapitalize="none"
         autoCorrect={false}
         returnKeyType="search"
+        textAlign="right"
+        testID={testID}
       />
       {value.length > 0 ? (
-        <TouchableOpacity
-          style={styles.clearButton}
+        <Pressable
+          style={[styles.clearButton, { backgroundColor: colors.muted }]}
           onPress={() => onChangeText('')}
           hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel="مسح البحث"
         >
-          <Text style={styles.clearText}>✕</Text>
-        </TouchableOpacity>
+          <Icon name="X" size={14} color={colors.mutedForeground} />
+        </Pressable>
       ) : null}
     </View>
   );
@@ -43,35 +72,26 @@ export function SearchBar({ value, onChangeText, placeholder = 'Search stores an
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
+    minHeight: 48,
     borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: spacing.md,
-    marginBottom: spacing.md,
-  },
-  searchIcon: {
-    fontSize: 14,
-    marginRight: spacing.sm,
+    borderRadius: 15,
+    paddingHorizontal: 13,
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 12,
   },
   input: {
     flex: 1,
-    paddingVertical: spacing.md,
-    ...typography.body,
-    color: colors.textPrimary,
+    minHeight: 44,
+    fontSize: 13,
+    paddingVertical: 0,
   },
   clearButton: {
     width: 24,
     height: 24,
-    borderRadius: borderRadius.full,
-    backgroundColor: colors.border,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  clearText: {
-    fontSize: 12,
-    color: colors.textSecondary,
   },
 });

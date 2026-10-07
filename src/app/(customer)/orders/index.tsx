@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import React, { useMemo, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { OrderRepository } from '@/features/orders/domain/repositories/OrderRepository';
@@ -10,13 +10,15 @@ import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { LoadingSpinner } from '@/shared/ui/components/LoadingSpinner';
 import { ErrorView } from '@/shared/ui/components/ErrorView';
-import { EmptyState } from '@/shared/ui/components/EmptyState';
+import { EmptyState } from '@/shared/ui/components/AppUI';
+import { BrandHeader } from '@/shared/ui/components/AppUI';
 import { ConfirmDialog } from '@/shared/ui/components/ConfirmDialog';
 import { showAlert } from '@/shared/utils/alert';
-import { colors } from '@/shared/ui/theme/colors';
-import { spacing } from '@/shared/ui/theme/spacing';
+import { useColors, useTheme } from '@/shared/ui/theme';
 
 const orderRepository: OrderRepository = new SupabaseOrderRepository();
+
+const TERMINAL_STATUSES = ['delivered', 'cancelled', 'expired', 'rejected'];
 
 export default function OrderHistoryScreen() {
   useRequireAuth('/(customer)/orders');
@@ -24,9 +26,13 @@ export default function OrderHistoryScreen() {
   const queryClient = useQueryClient();
   const customerId = useCurrentCustomerId();
   const reorder = useReorder();
+  const { theme } = useTheme();
+  const colors = useColors();
+  const [showHistory, setShowHistory] = useState(false);
+  const [hideTargetId, setHideTargetId] = useState<string | null>(null);
 
   const {
-    data: orders,
+    data: orders = [],
     isLoading,
     isError,
     refetch,
@@ -36,29 +42,92 @@ export default function OrderHistoryScreen() {
     enabled: Boolean(customerId),
   });
 
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => {
+      const isTerminal = TERMINAL_STATUSES.includes(order.status);
+      return showHistory ? isTerminal : !isTerminal;
+    });
+  }, [orders, showHistory]);
+
   const hideOrder = async (orderId: string) => {
     try {
       await orderRepository.hideOrder(orderId);
       queryClient.invalidateQueries({ queryKey: ['orders', customerId] });
     } catch (error) {
-      showAlert('Could not hide order', error instanceof Error ? error.message : 'Please try again.');
+      showAlert('تعذر إخفاء الطلب', error instanceof Error ? error.message : 'حاول مرة أخرى.');
     }
   };
 
-  const [hideTargetId, setHideTargetId] = useState<string | null>(null);
-
   if (isLoading || !customerId) {
-    return <LoadingSpinner />;
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <BrandHeader title="طلباتي" subtitle="تابع طلباتك بكل سهولة" />
+        <LoadingSpinner />
+      </View>
+    );
   }
 
   if (isError) {
-    return <ErrorView message="Could not load your orders." onRetry={refetch} />;
+    return (
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <BrandHeader title="طلباتي" subtitle="تابع طلباتك بكل سهولة" />
+        <ErrorView message="تعذر تحميل الطلبات." onRetry={refetch} />
+      </View>
+    );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <BrandHeader title="طلباتي" subtitle="تابع طلباتك بكل سهولة" />
+
+      {/* Segmented Control from SOURCE */}
+      <View style={styles.segmentWrap}>
+        <View style={[styles.segment, { backgroundColor: colors.muted }]}>
+          <Pressable
+            onPress={() => setShowHistory(false)}
+            style={[
+              styles.segmentButton,
+              { backgroundColor: !showHistory ? colors.card : 'transparent' },
+            ]}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                {
+                  color: !showHistory ? colors.foreground : colors.mutedForeground,
+                  fontFamily: theme.typography.label.fontFamily,
+                  fontWeight: !showHistory ? '700' : '500',
+                },
+              ]}
+            >
+              الطلبات الحالية
+            </Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setShowHistory(true)}
+            style={[
+              styles.segmentButton,
+              { backgroundColor: showHistory ? colors.card : 'transparent' },
+            ]}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                {
+                  color: showHistory ? colors.foreground : colors.mutedForeground,
+                  fontFamily: theme.typography.label.fontFamily,
+                  fontWeight: showHistory ? '700' : '500',
+                },
+              ]}
+            >
+              الطلبات السابقة
+            </Text>
+          </Pressable>
+        </View>
+      </View>
+
       <FlatList
-        data={orders ?? []}
+        data={filteredOrders}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <OrderSummaryCard
@@ -70,19 +139,25 @@ export default function OrderHistoryScreen() {
         )}
         ListEmptyComponent={
           <EmptyState
-            title="No orders yet"
-            message="Your placed orders will appear here."
-            emoji="📦"
+            title={showHistory ? 'لا توجد طلبات سابقة' : 'لا توجد طلبات حالية'}
+            message={
+              showHistory
+                ? 'ستظهر هنا طلباتك المكتملة أو الملغاة.'
+                : 'ستظهر طلباتك الجاري تجهيزها وتوصيلها هنا.'
+            }
+            icon="receipt-outline"
           />
         }
         contentContainerStyle={styles.listContent}
+        showsVerticalScrollIndicator={false}
       />
+
       <ConfirmDialog
         visible={hideTargetId !== null}
-        title="Remove from history?"
-        message="This order will be hidden from your history. It is kept securely on our servers."
-        confirmLabel="Remove"
-        cancelLabel="Keep"
+        title="إخفاء من السجل؟"
+        message="سيتم إخفاء هذا الطلب من سجلك في التطبيق."
+        confirmLabel="إخفاء"
+        cancelLabel="إلغاء"
         destructive
         onConfirm={() => {
           if (hideTargetId) void hideOrder(hideTargetId);
@@ -97,10 +172,32 @@ export default function OrderHistoryScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+  },
+  segmentWrap: {
+    paddingHorizontal: 18,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  segment: {
+    flexDirection: 'row-reverse',
+    padding: 4,
+    borderRadius: 14,
+    gap: 4,
+  },
+  segmentButton: {
+    flex: 1,
+    minHeight: 38,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentText: {
+    fontSize: 13,
   },
   listContent: {
-    padding: spacing.md,
-    paddingBottom: spacing.xl,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    paddingBottom: 112,
+    gap: 11,
   },
 });

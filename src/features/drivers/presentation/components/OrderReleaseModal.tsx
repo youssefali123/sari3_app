@@ -4,15 +4,14 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import { Button } from '@/shared/ui/components/Button';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
+import { useColors } from '@/shared/ui/hooks/useColors';
+import { PrimaryButton } from '@/shared/ui/components/AppUI';
 
 interface OrderReleaseModalProps {
   visible: boolean;
@@ -23,9 +22,8 @@ interface OrderReleaseModalProps {
 }
 
 /**
- * Self-report flow for an order the driver cannot complete. The reason is
- * mandatory: submit stays disabled with an inline hint while it is empty or
- * whitespace. No daily/shift release cap is enforced (FR-0xx US8).
+ * Self-report flow for an order the driver cannot complete.
+ * Elevated to SOURCE design language with RTL layout and Arabic text.
  */
 export function OrderReleaseModal({
   visible,
@@ -36,12 +34,10 @@ export function OrderReleaseModal({
 }: OrderReleaseModalProps) {
   const [reason, setReason] = useState('');
   const [keyboardPadding, setKeyboardPadding] = useState(0);
+  const colors = useColors();
   const trimmed = reason.trim();
   const valid = trimmed !== '';
 
-  // Android Modals create their own window and do not inherit the app's
-  // adjustResize behaviour, so the keyboard would cover the input. Track the
-  // keyboard height and pad the sheet manually; iOS uses KeyboardAvoidingView.
   useEffect(() => {
     if (Platform.OS !== 'android') return;
     const showListener = Keyboard.addListener('keyboardDidShow', (e) => {
@@ -67,42 +63,72 @@ export function OrderReleaseModal({
         style={styles.backdrop}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <View style={[styles.sheet, { paddingBottom: spacing.lg + keyboardPadding }]}>
-          <Text style={styles.title}>Release this order?</Text>
-          <Text style={styles.description}>
-            The order will return to the available pool for other drivers.
-            Please tell us why you cannot complete it.
+        <View
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: colors.card,
+              paddingBottom: 24 + keyboardPadding,
+            },
+          ]}
+        >
+          <View style={[styles.indicator, { backgroundColor: colors.border }]} />
+          <Text style={[styles.title, { color: colors.foreground }]}>
+            الاعتذار عن توصيل الطلب؟
+          </Text>
+          <Text style={[styles.description, { color: colors.mutedForeground }]}>
+            سيعود الطلب مباشرة إلى قائمة الطلبات المتاحة ليتمكن سائق آخر من استلامه. يرجى ذكر سبب عدم التمكن من إكمال التوصيل.
           </Text>
 
           <TextInput
-            style={styles.input}
+            style={[
+              styles.input,
+              {
+                borderColor: colors.border,
+                backgroundColor: colors.background,
+                color: colors.foreground,
+              },
+            ]}
             value={reason}
             onChangeText={setReason}
-            placeholder="Reason (required)"
-            placeholderTextColor={colors.textMuted}
+            placeholder="اكتب سبب الاعتذار (مطلوب)"
+            placeholderTextColor={colors.mutedForeground}
             multiline
+            textAlign="right"
             textAlignVertical="top"
             editable={!isSubmitting}
           />
           {!valid ? (
-            <Text style={styles.hint}>
-              Please provide a reason for releasing this order.
+            <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+              * كتابة السبب مطلوبة لإعادة إتاحة الطلب.
             </Text>
           ) : null}
 
-          {error ? <Text style={styles.errorText}>{error.message}</Text> : null}
+          {error ? (
+            <Text style={[styles.errorText, { color: colors.destructive }]}>
+              {error.message}
+            </Text>
+          ) : null}
 
-          <Button
-            title={isSubmitting ? 'Releasing…' : 'Release Order'}
-            onPress={() => onSubmit(trimmed)}
-            disabled={!valid || isSubmitting}
-          />
-          <Button
-            title="Keep"
-            variant="outline"
-            onPress={onClose}
-            disabled={isSubmitting}
-          />
+          <View style={styles.actions}>
+            <PrimaryButton
+              title="تأكيد الاعتذار وإعادة الطلب"
+              loading={isSubmitting}
+              onPress={() => onSubmit(trimmed)}
+            />
+            <Pressable
+              onPress={onClose}
+              disabled={isSubmitting}
+              style={({ pressed }) => [
+                styles.cancelButton,
+                { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+              ]}
+            >
+              <Text style={[styles.cancelText, { color: colors.foreground }]}>
+                الاستمرار في التوصيل
+              </Text>
+            </Pressable>
+          </View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -116,36 +142,57 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    padding: spacing.lg,
-    gap: spacing.md,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 20,
+    gap: 12,
+  },
+  indicator: {
+    width: 44,
+    height: 5,
+    borderRadius: 3,
+    alignSelf: 'center',
+    marginBottom: 6,
   },
   title: {
-    ...typography.h2,
-    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'right',
   },
   description: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'right',
   },
   input: {
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    minHeight: 96,
-    backgroundColor: colors.background,
-    ...typography.body,
-    color: colors.textPrimary,
+    borderRadius: 16,
+    padding: 14,
+    minHeight: 100,
+    fontSize: 14,
+    marginTop: 4,
   },
   hint: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    fontSize: 11,
+    textAlign: 'right',
   },
   errorText: {
-    ...typography.bodySmall,
-    color: colors.error,
+    fontSize: 12,
+    textAlign: 'center',
+  },
+  actions: {
+    gap: 10,
+    marginTop: 6,
+  },
+  cancelButton: {
+    minHeight: 48,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

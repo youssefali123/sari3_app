@@ -1,14 +1,14 @@
 import React from 'react';
 import {
   ActivityIndicator,
+  Pressable,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
+import { useColors } from '@/shared/ui/hooks/useColors';
+import { Icon } from '@/shared/ui/components/Icon';
+import { Surface } from '@/shared/ui/components/AppUI';
 import { formatDateTime } from '@/shared/utils/formatting';
 import { AvailableOrderPreview } from '../../domain/entities/AvailableOrderPreview';
 
@@ -24,9 +24,10 @@ interface AvailableOrderCardProps {
 }
 
 /**
- * Pre-acceptance projection of an unclaimed order. Shows store name, store
- * neighbourhood, and item count only — never the customer address or phone
- * (FR-004).
+ * Pre-acceptance projection of an unclaimed order.
+ * Upgraded to SOURCE DriverOrderCard design language:
+ * 20px radius Surface card, RTL layout, Lucide icons, quick accept & decline actions.
+ * Never reveals customer address or phone before claim (FR-004 preserved).
  */
 export function AvailableOrderCard({
   order,
@@ -36,106 +37,169 @@ export function AvailableOrderCard({
   onDecline,
   isDeclining,
 }: AvailableOrderCardProps) {
+  const colors = useColors();
+
   return (
-    <View style={styles.card}>
-      <TouchableOpacity
-        style={styles.body}
-        onPress={onOpen}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.storeName}>{order.storeName}</Text>
-        <Text style={styles.storeNeighbourhood}>{order.storeNeighbourhood}</Text>
-        <Text style={styles.meta}>
-          {order.itemCount} {order.itemCount === 1 ? 'item' : 'items'} ·{' '}
-          {formatDateTime(order.createdAt)}
-        </Text>
-      </TouchableOpacity>
-      <View style={styles.actions}>
-        {onClaim ? (
-          <TouchableOpacity
-            style={styles.claimButton}
-            onPress={onClaim}
-            disabled={isClaiming}
-            activeOpacity={0.7}
-          >
-            {isClaiming ? (
-              <ActivityIndicator size="small" color={colors.white} />
-            ) : (
-              <Text style={styles.claimText}>Accept</Text>
-            )}
-          </TouchableOpacity>
+    <Pressable
+      onPress={onOpen}
+      style={({ pressed }) => [
+        { opacity: pressed ? 0.92 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] },
+      ]}
+    >
+      <Surface style={styles.card}>
+        <View style={styles.headerRow}>
+          <View style={[styles.storeIconBox, { backgroundColor: colors.muted }]}>
+            <Icon name="ShoppingBag" size={22} color={colors.foreground} />
+          </View>
+          <View style={styles.headerCopy}>
+            <Text style={[styles.storeName, { color: colors.foreground }]}>
+              {order.storeName}
+            </Text>
+            <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+              {order.itemCount} {order.itemCount === 1 ? 'منتج' : 'منتجات'} · {formatDateTime(order.createdAt)}
+            </Text>
+          </View>
+        </View>
+
+        {order.storeNeighbourhood ? (
+          <View style={styles.detailLine}>
+            <Icon name="MapPin" size={16} color={colors.secondaryForeground} />
+            <Text style={[styles.detailText, { color: colors.foreground }]}>
+              منطقة الاستلام: {order.storeNeighbourhood}
+            </Text>
+          </View>
         ) : null}
-        {onDecline ? (
-          <TouchableOpacity
-            style={styles.declineButton}
-            onPress={onDecline}
-            disabled={isDeclining}
-            activeOpacity={0.7}
-          >
-            {isDeclining ? (
-              <ActivityIndicator size="small" color={colors.error} />
-            ) : (
-              <Text style={styles.declineText}>Decline</Text>
-            )}
-          </TouchableOpacity>
-        ) : null}
-      </View>
-    </View>
+
+        <View style={styles.actionsRow} onStartShouldSetResponder={() => true}>
+          {onDecline && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onDecline}
+              disabled={isDeclining}
+              style={({ pressed }) => [
+                styles.declineButton,
+                { borderColor: colors.border, opacity: pressed || isDeclining ? 0.6 : 1 },
+              ]}
+            >
+              {isDeclining ? (
+                <ActivityIndicator size="small" color={colors.destructive} />
+              ) : (
+                <Text style={[styles.declineText, { color: colors.mutedForeground }]}>
+                  تجاهل
+                </Text>
+              )}
+            </Pressable>
+          )}
+
+          {onClaim && (
+            <Pressable
+              accessibilityRole="button"
+              onPress={onClaim}
+              disabled={isClaiming}
+              style={({ pressed }) => [
+                styles.claimButton,
+                {
+                  backgroundColor: colors.primary,
+                  borderColor: colors.border,
+                  opacity: pressed || isClaiming ? 0.7 : 1,
+                },
+              ]}
+            >
+              {isClaiming ? (
+                <ActivityIndicator size="small" color={colors.foreground} />
+              ) : (
+                <View style={styles.claimButtonInner}>
+                  <Icon name="CheckCircle2" size={17} color={colors.foreground} />
+                  <Text style={[styles.claimText, { color: colors.foreground }]}>
+                    قبول الطلب
+                  </Text>
+                </View>
+              )}
+            </Pressable>
+          )}
+        </View>
+      </Surface>
+    </Pressable>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
+    gap: 12,
+    borderRadius: 20,
+    padding: 16,
   },
-  body: {
+  headerRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 12,
+  },
+  storeIconBox: {
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCopy: {
     flex: 1,
-    gap: spacing.xs,
+    alignItems: 'flex-end',
+    gap: 3,
   },
   storeName: {
-    ...typography.h3,
-    color: colors.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
+    textAlign: 'right',
   },
-  storeNeighbourhood: {
-    ...typography.bodySmall,
-    color: colors.textSecondary,
+  metaText: {
+    fontSize: 12,
+    textAlign: 'right',
   },
-  meta: {
-    ...typography.caption,
-    color: colors.textMuted,
+  detailLine: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    paddingVertical: 2,
   },
-  actions: {
-    gap: spacing.xs,
-    alignItems: 'stretch',
+  detailText: {
+    fontSize: 13,
+    flex: 1,
+    textAlign: 'right',
+  },
+  actionsRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    marginTop: 4,
   },
   claimButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.sm,
-    backgroundColor: colors.primary,
+    flex: 1,
+    minHeight: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  claimButtonInner: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 7,
   },
   claimText: {
-    ...typography.bodySmall,
-    color: colors.white,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
   },
   declineButton: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.sm,
+    minHeight: 44,
+    paddingHorizontal: 16,
+    borderRadius: 14,
     borderWidth: 1,
-    borderColor: colors.error,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   declineText: {
-    ...typography.bodySmall,
-    color: colors.error,
+    fontSize: 13,
     fontWeight: '600',
   },
 });

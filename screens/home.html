@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>تطبيق سريع - شاشة التوصيل الرئيسية</title>
+<!-- Tailwind CSS v3 with plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Tailwind Configuration -->
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              yellow: '#F5B318',
+              yellowLight: '#FFF8E7',
+              yellowHover: '#E5A510',
+              green: '#22A45D',
+              greenLight: '#EBF6F0',
+              dark: '#1E1E1E',
+              gray: '#71717A',
+              border: '#F0F0F2'
+            }
+          },
+          fontFamily: {
+            cairo: ['Cairo', 'IBM Plex Sans Arabic', 'sans-serif']
+          },
+          boxShadow: {
+            'card': '0 4px 20px -2px rgba(0, 0, 0, 0.05)',
+            'nav': '0 -4px 16px rgba(0, 0, 0, 0.04)'
+          }
+        }
+      }
+    }
+  </script>
+<!-- Google Font: Cairo -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800;900&amp;display=swap" rel="stylesheet"/>
+<!-- Custom Styles for Scrollbars & Native iOS Feel -->
+<style data-purpose="custom-layout">
+    body {
+      font-family: 'Cairo', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hide-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .hide-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 flex justify-center items-center min-h-screen">
+<!-- BEGIN: MobileDeviceFrame -->
+<div class="w-full max-w-[420px] bg-white min-h-screen relative shadow-2xl flex flex-col overflow-hidden pb-24 select-none">
+<!-- BEGIN: iOSStatusBar -->
+<!-- Native iOS Status Bar with Time, Wifi, Network & Battery -->
+<header class="w-full pt-3 pb-2 px-7 flex justify-between items-center z-50 bg-white" data-purpose="ios-status-bar">
+<span class="text-sm font-semibold tracking-tight text-neutral-900">9:41</span>
+<div class="flex items-center space-x-1.5 space-x-reverse text-neutral-900">
+<!-- Cellular Bars -->
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 18.25c-.2.2-.2.51 0 .71.2.2.51.2.71 0l.64-.64C7.24 19.46 9.5 20.25 12 20.25s4.76-.79 6.3-1.93l.64.64c.2.2.51.2.71 0 .2-.2.2-.51 0-.71l-.62-.64C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9zM2 18h3v4H2v-4zm5-4h3v8H7v-8zm5-5h3v13h-3V9zm5-5h3v18h-3V4z"></path>
+</svg>
+<!-- Wifi Icon -->
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.5c3.55 0 6.78 1.41 9.17 3.7L12 18.3 2.83 11.2C5.22 8.91 8.45 7.5 12 7.5z"></path>
+</svg>
+<!-- Battery Icon -->
+<svg class="w-5 h-5 fill-current" viewbox="0 0 24 24">
+<path d="M16 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2v-3h2v-6h-2V6c0-1.1-.9-2-2-2zm0 14H4V6h12v12z"></path>
+</svg>
+</div>
+</header>
+<!-- END: iOSStatusBar -->
+<!-- BEGIN: TopNavigationBar -->
+<!-- Location, App Logo & Notification Bell -->
+<section class="px-5 py-2 flex justify-between items-center bg-white" data-purpose="top-nav-bar">
+<!-- Location Selector -->
+<div class="flex items-center gap-1.5 cursor-pointer">
+<svg class="w-4 h-4 text-neutral-800" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+<path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-sm font-bold text-neutral-800">رأس سدر</span>
+<svg class="w-3.5 h-3.5 text-neutral-600" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M19 9l-7 7-7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<!-- Sari3 Brand Identity -->
+<div class="flex items-center gap-1">
+<div class="text-right">
+<div class="text-xl font-black text-neutral-900 tracking-tight leading-none">سريع</div>
+<span class="text-[9px] font-semibold text-neutral-800 block">مفيش أسرع من كده!</span>
+</div>
+<!-- Scooter Courier Icon Mascot -->
+<div class="w-9 h-9 relative flex items-center justify-center">
+<svg class="w-8 h-8 text-neutral-900" fill="none" viewbox="0 0 48 48">
+<circle cx="36" cy="38" fill="#F5B318" r="5" stroke="currentColor" stroke-width="3"></circle>
+<circle cx="12" cy="38" fill="#F5B318" r="5" stroke="currentColor" stroke-width="3"></circle>
+<path d="M12 38h14l4-10h6v-4h-8l-3 6h-7" stroke="currentColor" stroke-linecap="round" stroke-width="3"></path>
+<!-- Courier box -->
+<rect fill="#F5B318" height="11" rx="2" stroke="currentColor" stroke-width="2" width="10" x="6" y="20"></rect>
+<!-- Courier figure -->
+<circle cx="28" cy="12" fill="currentColor" r="4"></circle>
+<path d="M26 16l-5 8 5 4" stroke="currentColor" stroke-linecap="round" stroke-width="3"></path>
+</svg>
+</div>
+</div>
+<!-- Notification Bell -->
+<button aria-label="الإشعارات" class="w-9 h-9 flex items-center justify-center rounded-full hover:bg-neutral-100 transition relative">
+<svg class="w-5 h-5 text-neutral-800" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</section>
+<!-- END: TopNavigationBar -->
+<!-- BEGIN: MainContentScrollable -->
+<main class="flex-1 overflow-y-auto px-4 pt-2 space-y-4 hide-scrollbar">
+<!-- BEGIN: HeroGreetingBanner -->
+<!-- Yellow Welcome Banner with Delivery Scooter Graphic -->
+<div class="w-full bg-[#F5B318] rounded-3xl p-5 relative overflow-hidden shadow-sm flex items-center justify-between min-h-[160px]" data-purpose="hero-banner">
+<!-- Scooter / Courier Vector illustration on the left -->
+<div class="relative w-40 h-32 flex items-center justify-center">
+<!-- Yellow Delivery Scooter Graphics -->
+<svg class="w-full h-full drop-shadow-md" fill="none" viewbox="0 0 160 120" xmlns="http://www.w3.org/2000/svg">
+<!-- Scooter Body -->
+<path d="M45 88C45 96.2843 38.2843 103 30 103C21.7157 103 15 96.2843 15 88C15 79.7157 21.7157 73 30 73C38.2843 73 45 79.7157 45 88Z" fill="#262626"></path>
+<path d="M30 94C33.3137 94 36 91.3137 36 88C36 84.6863 33.3137 82 30 82C26.6863 82 24 84.6863 24 88C24 91.3137 26.6863 94 30 94Z" fill="#E5E5E5"></path>
+<path d="M135 88C135 96.2843 128.284 103 120 103C111.716 103 105 96.2843 105 88C105 79.7157 111.716 73 120 73C128.284 73 135 79.7157 135 88Z" fill="#262626"></path>
+<path d="M120 94C123.314 94 126 91.3137 126 88C126 84.6863 123.314 82 120 82C116.686 82 114 84.6863 114 88C114 91.3137 116.686 94 120 94Z" fill="#E5E5E5"></path>
+<!-- Scooter Main Chassis (Vespa styling) -->
+<path d="M35 82C35 82 45 60 70 65C85 68 95 80 115 82C122 82.5 125 78 125 78L112 55L100 55" fill="#E2A20E"></path>
+<path d="M42 78C42 78 52 58 75 62C88 64 96 76 118 78C120 78 122 75 122 75" stroke="#262626" stroke-width="3"></path>
+<!-- Scooter Seat -->
+<path d="M45 56C45 54 52 52 68 52C75 52 82 54 82 58C82 62 45 61 45 56Z" fill="#1C1917"></path>
+<!-- Handlebar & Headlight -->
+<path d="M100 56L108 38L103 36" stroke="#262626" stroke-linecap="round" stroke-width="4"></path>
+<circle cx="109" cy="36" fill="#F8FAFC" r="6" stroke="#262626" stroke-width="2"></circle>
+<!-- Back Delivery Box -->
+<rect fill="#ECA710" height="34" rx="5" stroke="#1C1917" stroke-width="2.5" width="38" x="22" y="24"></rect>
+<rect fill="#F4B41A" height="28" rx="3" width="32" x="25" y="27"></rect>
+<!-- Delivery Logo on Box -->
+<path d="M37 40L41 35H45L42 45H38" stroke="#1C1917" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+<circle cx="43" cy="33" fill="#1C1917" r="1.5"></circle>
+<circle cx="36" cy="46" fill="#1C1917" r="2"></circle>
+<circle cx="46" cy="46" fill="#1C1917" r="2"></circle>
+<!-- Speed wind lines -->
+<path d="M8 68H20M5 75H15M10 82H18" stroke="#E2A20E" stroke-linecap="round" stroke-width="2.5"></path>
+</svg>
+</div>
+<!-- Greeting Texts -->
+<div class="text-right flex-1 pr-2 z-10">
+<div class="flex items-center justify-start gap-1">
+<h2 class="text-xl font-bold text-neutral-900 leading-tight">صباح الخير، أدهم</h2>
+<span class="text-xl">👋</span>
+</div>
+<p class="text-2xl font-black text-neutral-900 mt-1">ماذا تريد اليوم؟</p>
+</div>
+</div>
+<!-- END: HeroGreetingBanner -->
+<!-- BEGIN: QuickCategoryCards -->
+<!-- Restaurants & Market Navigation Grid -->
+<section class="grid grid-cols-2 gap-3.5" data-purpose="categories-grid">
+<!-- Restaurants Card (مطاعم) -->
+<div class="bg-[#FFF8EE] rounded-3xl p-3.5 relative flex flex-col items-center justify-between border border-amber-100/70 shadow-sm cursor-pointer active:scale-95 transition">
+<div class="w-full text-right">
+<h3 class="text-base font-extrabold text-neutral-950">مطاعم</h3>
+<p class="text-[11px] text-neutral-500 font-medium mt-0.5">اطلب من أفضل المطاعم</p>
+</div>
+<!-- Burger Product Image -->
+<div class="my-2 h-20 w-24 flex items-center justify-center">
+<img alt="مطاعم وبرجر" class="max-h-full max-w-full object-contain drop-shadow-md rounded-full" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCRpBLtEmKwSPF6E84FvJ9KhTks1gU85-bI2mOH8nuRIy4du_mRCIz4tLJ0BWYA1apcKYNtzh7JegeDbRtGpBp2JdJ7bWOHdRgOtfG4c-lXovpikzKpACON_SxYeZihZkD6cReQrJes001utib_ulhZXdhnoYVRoP_oz-jks-Dj0UwvJ1lc638LpQIIbtVvc0zcUPpwrPo14e7QBqesV49fjJD6BmxkX_0cN40R5pLbmntCEYWsHyT5tQ"/>
+</div>
+<!-- Action Arrow Button -->
+<div class="self-center mt-1">
+<div class="w-8 h-8 rounded-full bg-[#F5B318] flex items-center justify-center text-white shadow-sm">
+<svg class="w-4 h-4 transform rotate-180" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+</div>
+<!-- Market Card (ماركت) -->
+<div class="bg-[#F2F8F4] rounded-3xl p-3.5 relative flex flex-col items-center justify-between border border-emerald-100/60 shadow-sm cursor-pointer active:scale-95 transition">
+<div class="w-full text-right">
+<h3 class="text-base font-extrabold text-neutral-950">ماركت</h3>
+<p class="text-[11px] text-neutral-500 font-medium mt-0.5">كل احتياجاتك اليومية</p>
+</div>
+<!-- Grocery Basket Image -->
+<div class="my-2 h-20 w-24 flex items-center justify-center">
+<img alt="بقالة وماركت" class="max-h-full max-w-full object-contain drop-shadow-md rounded-xl" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCHnBPfPCB7I_ulfl_fhCvqy4ApyXrMVLpH3JMd291Bsvfvn98xWAoirSTRhFZpmwR2MvRDR-CmJC1gsuOc_Lhcea3Ek_4qvTnUGAd_UtHn6M321MHeWW6kf2atAP4daT1Etm4-aCGTDyXUsHj8Zk-9YbOOfJ_6aM2C2tM3bBhEeNvPufAUJApPuCl65vQBuE_PVyU_CuV9yeKML8cr5xGIjS3o72difORFPyPoqGNBBYiLAyttSFNw1w"/>
+</div>
+<!-- Action Arrow Button -->
+<div class="self-center mt-1">
+<div class="w-8 h-8 rounded-full bg-[#22A45D] flex items-center justify-center text-white shadow-sm">
+<svg class="w-4 h-4 transform rotate-180" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+</div>
+</section>
+<!-- END: QuickCategoryCards -->
+<!-- BEGIN: OffersBanner -->
+<!-- Special Discounts and Promotions Strip -->
+<section class="w-full bg-[#FFFBF0] border border-amber-200/50 rounded-2xl p-3.5 flex items-center justify-between shadow-sm cursor-pointer" data-purpose="offers-banner">
+<!-- Percentage Tag Graphics -->
+<div class="w-12 h-12 flex items-center justify-center relative">
+<div class="w-10 h-10 bg-amber-400 rounded-xl transform -rotate-12 flex items-center justify-center shadow-md border-2 border-amber-300">
+<span class="text-white font-black text-xl">%</span>
+</div>
+</div>
+<!-- Offers Description -->
+<div class="text-center flex-1 px-2">
+<div class="flex items-center justify-center gap-1">
+<span class="text-amber-500 text-sm">🔥</span>
+<h4 class="font-extrabold text-neutral-900 text-sm">العروض والخصومات</h4>
+</div>
+<p class="text-[11px] text-neutral-500 font-medium">وفر أكثر مع عروضنا الحصرية</p>
+</div>
+<!-- Yellow Circle Arrow -->
+<div class="w-8 h-8 rounded-full bg-[#FFF4D9] flex items-center justify-center text-[#F5B318]">
+<svg class="w-4 h-4 transform rotate-180" fill="none" stroke="currentColor" stroke-width="2.5" viewbox="0 0 24 24">
+<path d="M14 5l7 7m0 0l-7 7m7-7H3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</section>
+<!-- END: OffersBanner -->
+<!-- BEGIN: MostPopularSection -->
+<!-- Horizontal Carousel of Top Rated Food Items -->
+<section class="pt-1" data-purpose="most-popular-section">
+<!-- Section Header -->
+<div class="flex items-center justify-between mb-3 px-1">
+<h3 class="font-black text-neutral-900 text-lg">الأكثر طلباً</h3>
+<a class="text-[#F5B318] text-sm font-bold hover:underline" href="#">عرض الكل</a>
+</div>
+<!-- Horizontal Scroll Cards Container -->
+<div class="flex gap-3 overflow-x-auto pb-3 -mx-4 px-4 hide-scrollbar">
+<!-- Card 1: تريو -->
+<div class="min-w-[170px] max-w-[170px] bg-white rounded-2xl overflow-hidden border border-neutral-100 shadow-card flex flex-col">
+<!-- Meal Image with Badge and Favorite -->
+<div class="relative h-28 w-full bg-neutral-100">
+<img alt="مطعم تريو برجر" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwV1nw7TqhkhJIFgrilM72HoI0LnxG1_rSfyphH-hssupN2GbXk4kRTw31VztdM7bHoyu_LTEfBlwTESLuILc2vbZ18LykM_6HV_20fs4w6R12WoG4ATeggGVvDZOiQt8BbFmdN3Ep2WR_wUOASkl9MLTECD2fPGRw6gk_AchWqudJj1BmOUCy8sN-JD7KfSeL1hTywHgcw_KitH-sobxZjkrYa59lMw0R1ctIwfG6K0J0HUvX4k8bWw"/>
+<!-- Delivery Time Badge -->
+<div class="absolute bottom-2 right-2 bg-[#F5B318] text-neutral-950 font-bold text-[10px] px-2 py-0.5 rounded-lg shadow-sm">
+                30-40 دقيقة
+              </div>
+<!-- Favorite Heart -->
+<button aria-label="أضف إلى المفضلة" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Restaurant Info -->
+<div class="p-2.5 text-right flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between">
+<h4 class="font-extrabold text-neutral-900 text-sm">تريو</h4>
+<div class="flex items-center text-xs font-bold text-neutral-800">
+<span>4.6</span>
+<span class="text-emerald-500 mr-0.5 text-[11px]">★</span>
+</div>
+</div>
+<p class="text-[11px] text-neutral-500 mt-0.5">برجر - سندوتشات</p>
+</div>
+<div class="text-[11px] text-neutral-600 font-medium mt-1">
+                توصيل 20 ج
+              </div>
+</div>
+</div>
+<!-- Card 2: الشيف -->
+<div class="min-w-[170px] max-w-[170px] bg-white rounded-2xl overflow-hidden border border-neutral-100 shadow-card flex flex-col">
+<!-- Meal Image with Badge and Favorite -->
+<div class="relative h-28 w-full bg-neutral-100">
+<img alt="مشويات الشيف" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAAcrS_9I0K0D_r93bQjLaUw-UhNM2Oje_SVQj17a6Riu8dszWBChoe3IumnGmLT44PIXczSNT_6cD0lDXWPhR1ppbrYXRl372RaC6yNve01HG-Q6SHLSH1n_RnpRYQGw3gWZAAHIxS4Mbo705K1Tk5ZAhG6jiaLstQ4cs0Qm3f2ohPbXoszALM0JwSewf1uC0AA6xFPFMWD-iT1KeOSCIVFsInWde_YXerZqBLa9HfoBx3JOE_-V55NA"/>
+<!-- Delivery Time Badge -->
+<div class="absolute bottom-2 right-2 bg-[#F5B318] text-neutral-950 font-bold text-[10px] px-2 py-0.5 rounded-lg shadow-sm">
+                25-35 دقيقة
+              </div>
+<!-- Favorite Heart -->
+<button aria-label="أضف إلى المفضلة" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Restaurant Info -->
+<div class="p-2.5 text-right flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between">
+<h4 class="font-extrabold text-neutral-900 text-sm">الشيف</h4>
+<div class="flex items-center text-xs font-bold text-neutral-800">
+<span>4.4</span>
+<span class="text-emerald-500 mr-0.5 text-[11px]">★</span>
+</div>
+</div>
+<p class="text-[11px] text-neutral-500 mt-0.5">مشويات - كريب</p>
+</div>
+<div class="text-[11px] text-neutral-600 font-medium mt-1">
+                توصيل 20 ج
+              </div>
+</div>
+</div>
+<!-- Card 3: المطعم الإيطالي -->
+<div class="min-w-[170px] max-w-[170px] bg-white rounded-2xl overflow-hidden border border-neutral-100 shadow-card flex flex-col">
+<!-- Meal Image with Badge and Favorite -->
+<div class="relative h-28 w-full bg-neutral-100">
+<img alt="المطعم الإيطالي بيتزا" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDkJ9V4BJ3Vps5tMUVxe7Ag9P-TGvpTwavILGNO29VBVzK-0oTZfvRLlWV6KivoZ4T24DUpQ00j9PLvcRyRqMQEAwOYqUd3sxjByGepGT4vROaiiJe1EbCvvkNPb4W7HB4FVge-u8sYrAxVRLpK1Yai1KecZwHV1USvGUXvSJ6US45N7eiWdVaOatyotRf8fihkKu0ht8-ZHCfidu0qZ4SeJzrpOPHeJmuwhwmaFwAESsoIuywqIUjduA"/>
+<!-- Delivery Time Badge -->
+<div class="absolute bottom-2 right-2 bg-[#F5B318] text-neutral-950 font-bold text-[10px] px-2 py-0.5 rounded-lg shadow-sm">
+                30-40 دقيقة
+              </div>
+<!-- Favorite Heart -->
+<button aria-label="أضف إلى المفضلة" class="absolute top-2 right-2 w-6 h-6 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center text-white">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Restaurant Info -->
+<div class="p-2.5 text-right flex-1 flex flex-col justify-between">
+<div>
+<div class="flex items-center justify-between">
+<h4 class="font-extrabold text-neutral-900 text-sm truncate">المطعم الإيطالي</h4>
+<div class="flex items-center text-xs font-bold text-neutral-800">
+<span>4.7</span>
+<span class="text-emerald-500 mr-0.5 text-[11px]">★</span>
+</div>
+</div>
+<p class="text-[11px] text-neutral-500 mt-0.5">بيتزا - باستا</p>
+</div>
+<div class="text-[11px] text-neutral-600 font-medium mt-1">
+                توصيل 20 ج
+              </div>
+</div>
+</div>
+</div>
+</section>
+<!-- END: MostPopularSection -->
+<!-- BEGIN: LastOrderCard -->
+<!-- Reorder Previous Meal Promotion Card -->
+<section class="bg-[#F0F7F4] rounded-3xl p-4 border border-emerald-50 relative overflow-hidden shadow-sm flex items-center justify-between" data-purpose="last-order-card">
+<!-- Left details: Bag Icon, Name, Reorder Button -->
+<div class="flex items-center gap-3">
+<!-- Shopping Bag Icon Circle -->
+<div class="w-11 h-11 rounded-full bg-white flex items-center justify-center shadow-sm text-emerald-600">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div class="text-right">
+<span class="text-[11px] font-semibold text-neutral-500 block">آخر طلب</span>
+<h4 class="text-base font-extrabold text-neutral-900 leading-tight">من تريو</h4>
+<!-- Order Again Button -->
+<button class="mt-2 bg-[#22A45D] hover:bg-emerald-700 text-white text-xs font-bold py-1.5 px-4 rounded-xl shadow transition">
+              اطلب مرة أخرى
+            </button>
+</div>
+</div>
+<!-- Right: Meal Thumbnail with Drink -->
+<div class="relative w-24 h-20 flex items-center justify-end">
+<img alt="وجبة سابقة برجر ومشروب" class="w-20 h-20 rounded-full object-cover border-2 border-white shadow-md" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAoIxAAg0GWtfSe6OZPtTE8oSUeDP0IMEBYSyHzNaFoP8-c-ckuNw3JJpRKVRs7GlI5Hqnf1vTSNgaEDuAmE_MGhvL9UDIS6nSZKdKOLJH62BAaQy7TMnoTfpQVIYAEcG-e82tLApBpuVQeLmcZ1wEkTRhY9uPM9z4hah4ucrcpod8SvgwkYa4Qx-gMNgiiYScm4Tp5AeZ2Vrf3H6cYrNLHH0tQWsoD7NNawq6wVgblYA2g8FXdwq69AQ"/>
+</div>
+</section>
+<!-- END: LastOrderCard -->
+</main>
+<!-- END: MainContentScrollable -->
+<!-- BEGIN: BottomNavigationBar -->
+<!-- 5 Tab Navigation: Home, Orders, Favorite, Profile, More -->
+<nav class="absolute bottom-0 left-0 right-0 bg-white border-t border-neutral-100 shadow-nav px-5 py-2 z-50 flex justify-between items-center" data-purpose="bottom-navigation">
+<!-- Tab 1: Profile (حسابي) -->
+<a class="flex flex-col items-center gap-1 text-neutral-700 hover:text-neutral-900 transition" href="#">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[11px] font-medium">حسابي</span>
+</a>
+<!-- Tab 2: Orders (طلباتي) -->
+<a class="flex flex-col items-center gap-1 text-neutral-700 hover:text-neutral-900 transition" href="#">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[11px] font-medium">طلباتي</span>
+</a>
+<!-- Tab 3: Home (الرئيسية) - Active Highlighted -->
+<a class="flex flex-col items-center gap-0.5" href="#">
+<div class="w-12 h-9 bg-[#F5B318] rounded-xl flex items-center justify-center text-neutral-900 shadow-sm">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewbox="0 0 24 24">
+<path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-[11px] font-bold text-neutral-900">الرئيسية</span>
+</a>
+<!-- Tab 4: Favorites (المفضلة) -->
+<a class="flex flex-col items-center gap-1 text-neutral-700 hover:text-neutral-900 transition" href="#">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[11px] font-medium">المفضلة</span>
+</a>
+<!-- Tab 5: More (المزيد) -->
+<a class="flex flex-col items-center gap-1 text-neutral-700 hover:text-neutral-900 transition" href="#">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M5 12h.01M12 12h.01M19 12h.01M6 12a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[11px] font-medium">المزيد</span>
+</a>
+</nav>
+<!-- END: BottomNavigationBar -->
+<!-- iOS Home Indicator -->
+<div class="absolute bottom-1.5 left-1/2 transform -translate-x-1/2 w-32 h-1 bg-neutral-900 rounded-full z-50 pointer-events-none"></div>
+</div>
+<!-- END: MobileDeviceFrame -->
+</body></html>

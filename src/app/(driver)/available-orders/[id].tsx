@@ -1,29 +1,34 @@
 import React, { useState } from 'react';
 import {
-  ActivityIndicator,
-  ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
+import { useColors } from '@/shared/ui/hooks/useColors';
+import {
+  AppScreen,
+  BrandHeader,
+  EmptyState,
+  LoadingState,
+  PageScroll,
+  PrimaryButton,
+  Surface,
+} from '@/shared/ui/components';
+import { Icon } from '@/shared/ui/components/Icon';
 import { formatDateTime } from '@/shared/utils/formatting';
 import { useAvailableOrders } from '@/features/drivers/application/hooks/useAvailableOrders';
 
-const NOT_AVAILABLE_MESSAGE = 'This order is no longer available.';
+const NOT_AVAILABLE_MESSAGE = 'هذا الطلب لم يعد متاحاً (تم قبوله من سائق آخر أو تم إلغاؤه).';
 
 /**
- * Privacy-safe preview of a single unclaimed order: the same fields as the
- * pool card plus an Accept action. Full delivery details are revealed only
- * after a successful claim.
+ * Privacy-safe preview of a single unclaimed order.
+ * Upgraded to SOURCE design language with BrandHeader, Surface, and PrimaryButton.
  */
 export default function AvailableOrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const colors = useColors();
   const { orders, isLoading, claim, isClaiming, error } = useAvailableOrders();
   const [notAvailable, setNotAvailable] = useState(false);
 
@@ -45,121 +50,155 @@ export default function AvailableOrderDetailScreen() {
 
   if (isLoading) {
     return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <AppScreen>
+        <BrandHeader title="تفاصيل الطلب" onBack={() => router.back()} />
+        <LoadingState />
+      </AppScreen>
     );
   }
 
   if (notAvailable || !preview) {
     return (
-      <View style={styles.centered}>
-        <Text style={styles.notAvailableText}>{NOT_AVAILABLE_MESSAGE}</Text>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
-          <Text style={styles.backButtonText}>Back to available orders</Text>
-        </TouchableOpacity>
-      </View>
+      <AppScreen>
+        <BrandHeader title="تفاصيل الطلب" onBack={() => router.back()} />
+        <View style={styles.centerContainer}>
+          <EmptyState
+            emoji="⚠️"
+            title="الطلب غير متاح"
+            message={NOT_AVAILABLE_MESSAGE}
+            action={
+              <PrimaryButton
+                title="العودة للطلبات المتاحة"
+                icon="arrow-back"
+                onPress={() => router.back()}
+              />
+            }
+          />
+        </View>
+      </AppScreen>
     );
   }
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      <Text style={styles.storeName}>{preview.storeName}</Text>
-      <Text style={styles.storeNeighbourhood}>{preview.storeNeighbourhood}</Text>
-      <Text style={styles.meta}>
-        {preview.itemCount} {preview.itemCount === 1 ? 'item' : 'items'} ·{' '}
-        {formatDateTime(preview.createdAt)}
-      </Text>
-      <Text style={styles.privacyNote}>
-        Delivery address and customer contact are shown after you accept.
-      </Text>
+    <AppScreen>
+      <BrandHeader
+        title="تفاصيل الطلب"
+        subtitle={`طلب من ${preview.storeName}`}
+        onBack={() => router.back()}
+      />
+      <PageScroll>
+        <Surface style={styles.orderCard}>
+          <View style={styles.storeHeader}>
+            <View style={[styles.storeIcon, { backgroundColor: colors.muted }]}>
+              <Icon name="ShoppingBag" size={26} color={colors.foreground} />
+            </View>
+            <View style={styles.storeCopy}>
+              <Text style={[styles.storeName, { color: colors.foreground }]}>
+                {preview.storeName}
+              </Text>
+              <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+                {preview.itemCount} {preview.itemCount === 1 ? 'منتج' : 'منتجات'} · {formatDateTime(preview.createdAt)}
+              </Text>
+            </View>
+          </View>
 
-      {error ? <Text style={styles.errorText}>{error.message}</Text> : null}
+          {preview.storeNeighbourhood ? (
+            <View style={styles.detailLine}>
+              <Icon name="MapPin" size={17} color={colors.secondaryForeground} />
+              <Text style={[styles.detailText, { color: colors.foreground }]}>
+                منطقة الاستلام: {preview.storeNeighbourhood}
+              </Text>
+            </View>
+          ) : null}
 
-      <TouchableOpacity
-        style={[styles.acceptButton, isClaiming && styles.buttonDisabled]}
-        onPress={handleAccept}
-        disabled={isClaiming}
-        activeOpacity={0.8}
-      >
-        {isClaiming ? (
-          <ActivityIndicator color={colors.white} />
-        ) : (
-          <Text style={styles.acceptButtonText}>Accept Order</Text>
-        )}
-      </TouchableOpacity>
-    </ScrollView>
+          <Surface style={[styles.privacyNotice, { backgroundColor: colors.muted }]}>
+            <Icon name="HelpCircle" size={18} color={colors.mutedForeground} />
+            <Text style={[styles.privacyNote, { color: colors.mutedForeground }]}>
+              عنوان التوصيل الدقيق وبيانات الاتصال بالعميل ستظهر فور تأكيد قبولك للطلب.
+            </Text>
+          </Surface>
+
+          {error ? (
+            <Text style={[styles.errorText, { color: colors.destructive }]}>
+              {error.message}
+            </Text>
+          ) : null}
+
+          <PrimaryButton
+            title="قبول وبدء التوصيل"
+            icon="checkmark"
+            loading={isClaiming}
+            onPress={() => void handleAccept()}
+          />
+        </Surface>
+      </PageScroll>
+    </AppScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  centerContainer: {
     flex: 1,
-    backgroundColor: colors.background,
-  },
-  content: {
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  centered: {
-    flex: 1,
+    paddingHorizontal: 18,
     justifyContent: 'center',
+    paddingBottom: 60,
+  },
+  orderCard: {
+    gap: 16,
+    padding: 18,
+    borderRadius: 22,
+  },
+  storeHeader: {
+    flexDirection: 'row-reverse',
     alignItems: 'center',
-    padding: spacing.lg,
-    backgroundColor: colors.background,
+    gap: 14,
+  },
+  storeIcon: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  storeCopy: {
+    flex: 1,
+    alignItems: 'flex-end',
+    gap: 4,
   },
   storeName: {
-    ...typography.h2,
-    color: colors.textPrimary,
+    fontSize: 18,
+    fontWeight: '800',
+    textAlign: 'right',
   },
-  storeNeighbourhood: {
-    ...typography.body,
-    color: colors.textSecondary,
+  metaText: {
+    fontSize: 13,
+    textAlign: 'right',
   },
-  meta: {
-    ...typography.bodySmall,
-    color: colors.textMuted,
+  detailLine: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+  },
+  detailText: {
+    fontSize: 14,
+    flex: 1,
+    textAlign: 'right',
+  },
+  privacyNotice: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 10,
+    padding: 12,
+    borderRadius: 14,
   },
   privacyNote: {
-    ...typography.caption,
-    color: colors.textMuted,
-    marginTop: spacing.xs,
+    fontSize: 12,
+    lineHeight: 18,
+    flex: 1,
+    textAlign: 'right',
   },
   errorText: {
-    ...typography.bodySmall,
-    color: colors.error,
-  },
-  notAvailableText: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontSize: 12,
     textAlign: 'center',
-    marginBottom: spacing.md,
-  },
-  acceptButton: {
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
-    alignItems: 'center',
-    marginTop: spacing.md,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  acceptButtonText: {
-    ...typography.body,
-    color: colors.white,
-    fontWeight: '700',
-  },
-  backButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-  },
-  backButtonText: {
-    ...typography.body,
-    color: colors.primary,
-    fontWeight: '600',
   },
 });
