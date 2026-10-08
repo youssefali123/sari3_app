@@ -2,22 +2,23 @@ import React, { useEffect, useState } from 'react';
 import {
   FlatList,
   Keyboard,
-  KeyboardAvoidingView,
+  KeyboardEvent,
   Modal,
   Platform,
+  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { SavedDeliveryAddress } from '../domain/entities/SavedDeliveryAddress';
 import { AddressCard } from './AddressCard';
-import { Button } from '@/shared/ui/components/Button';
 import { Input } from '@/shared/ui/components/Input';
-import { LoadingSpinner } from '@/shared/ui/components/LoadingSpinner';
-import { EmptyState } from '@/shared/ui/components/EmptyState';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
+import { SkeletonCard, useSmoothKeyboardElevation } from '@/shared/ui/motion';
+import { EmptyState, PrimaryButton } from '@/shared/ui/components/AppUI';
+import { Icon } from '@/shared/ui/components/Icon';
+import { useColors, useTheme } from '@/shared/ui/theme';
 
 interface AddressSelectionModalProps {
   visible: boolean;
@@ -31,7 +32,7 @@ interface AddressSelectionModalProps {
 
 /**
  * Modal for choosing a saved delivery address at checkout, or adding a
- * new one inline (FR-016).
+ * new one inline — smoothly elevates above the keyboard when typing.
  */
 export function AddressSelectionModal({
   visible,
@@ -42,22 +43,9 @@ export function AddressSelectionModal({
   onClose,
   onAddNew,
 }: AddressSelectionModalProps) {
-  const [keyboardPadding, setKeyboardPadding] = useState(0);
-  // Android Modals do not inherit adjustResize — pad the sheet by the
-  // keyboard height so inputs stay visible (same fix as OrderReleaseModal).
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    const showListener = Keyboard.addListener('keyboardDidShow', (e) => {
-      setKeyboardPadding(e.endCoordinates.height);
-    });
-    const hideListener = Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardPadding(0);
-    });
-    return () => {
-      showListener.remove();
-      hideListener.remove();
-    };
-  }, []);
+  const colors = useColors();
+  const { theme } = useTheme();
+  const animatedKeyboardStyle = useSmoothKeyboardElevation();
 
   const [showForm, setShowForm] = useState(false);
   const [label, setLabel] = useState('');
@@ -66,8 +54,12 @@ export function AddressSelectionModal({
   const [formError, setFormError] = useState<string | null>(null);
 
   async function handleAddNew() {
-    if (!label.trim() || !addressText.trim()) {
-      setFormError('Label and address are required.');
+    if (!label.trim()) {
+      setFormError('يرجى إدخال تسمية للعنوان (مثال: المنزل).');
+      return;
+    }
+    if (!addressText.trim()) {
+      setFormError('يرجى كتابة العنوان بالتفصيل.');
       return;
     }
     setFormError(null);
@@ -77,62 +69,129 @@ export function AddressSelectionModal({
       setLabel('');
       setAddressText('');
       setShowForm(false);
+      Keyboard.dismiss();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'Could not save address.');
+      setFormError(error instanceof Error ? error.message : 'تعذر حفظ العنوان.');
     } finally {
       setSaving(false);
     }
   }
 
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View style={[styles.sheet, { paddingBottom: spacing.lg + keyboardPadding }]}>
-          <Text style={styles.title}>Select delivery address</Text>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={styles.backdrop}>
+        {/* Tapping outside dismisses keyboard and closes modal */}
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={() => {
+            Keyboard.dismiss();
+            onClose();
+          }}
+        />
+
+        <Animated.View
+          style={[
+            styles.sheet,
+            { backgroundColor: colors.card },
+            animatedKeyboardStyle,
+          ]}
+        >
+          {/* Header */}
+          <View style={styles.header}>
+            <Pressable
+              onPress={() => {
+                Keyboard.dismiss();
+                onClose();
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+              accessibilityLabel="إغلاق"
+              style={styles.closeBtn}
+            >
+              <Icon name="X" size={20} color={colors.mutedForeground} />
+            </Pressable>
+            <Text
+              style={[
+                styles.title,
+                {
+                  color: colors.foreground,
+                  fontFamily: theme.typography.headingSmall.fontFamily,
+                },
+              ]}
+            >
+              {showForm ? 'إضافة عنوان توصيل' : 'اختر عنوان التوصيل'}
+            </Text>
+          </View>
 
           {showForm ? (
-            <View>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.formContainer}
+            >
               <Input
-                label="Label (e.g. Home, Work)"
+                label="تسمية العنوان"
                 value={label}
                 onChangeText={setLabel}
-                placeholder="Home"
+                placeholder="مثال: المنزل، العمل، الشقة..."
+                testID="checkout-address-label-input"
               />
               <Input
-                label="Full address"
+                label="العنوان بالتفصيل"
                 value={addressText}
                 onChangeText={setAddressText}
-                placeholder="Street, building, floor, landmark…"
+                placeholder="الشارع، رقم البناية، رقم الطابق، علامة مميزة..."
                 multiline
+                numberOfLines={3}
+                style={styles.multilineInput}
+                testID="checkout-address-text-input"
               />
-              {formError ? <Text style={styles.formError}>{formError}</Text> : null}
-              <View style={styles.formButtons}>
-                <Button
-                  title="Cancel"
-                  variant="outline"
-                  onPress={() => {
-                    setShowForm(false);
-                    setFormError(null);
-                  }}
+              {formError ? (
+                <Text style={[styles.formError, { color: colors.destructive }]}>{formError}</Text>
+              ) : null}
+              <View style={styles.formActions}>
+                <PrimaryButton
+                  title="حفظ واختيار العنوان"
+                  icon="checkmark-circle-outline"
+                  onPress={handleAddNew}
+                  loading={saving}
+                  testID="save-new-address-checkout"
                 />
-                <Button title="Save" onPress={handleAddNew} loading={saving} />
+              </View>
+            </ScrollView>
+          ) : isLoading ? (
+            <View style={styles.skeletonWrap}>
+              {[0, 1].map((idx) => (
+                <SkeletonCard key={idx} style={styles.skeletonItem} />
+              ))}
+            </View>
+          ) : !addresses || addresses.length === 0 ? (
+            <View style={styles.emptyWrap}>
+              <EmptyState
+                title="لا توجد عناوين محفوظة"
+                message="أضف عنوان توصيل لإكمال الطلب."
+                icon="location-outline"
+              />
+              <View style={styles.addFirstBtn}>
+                <PrimaryButton
+                  title="إضافة عنوان جديد"
+                  icon="add-circle"
+                  onPress={() => setShowForm(true)}
+                />
               </View>
             </View>
-          ) : isLoading ? (
-            <LoadingSpinner />
-          ) : !addresses || addresses.length === 0 ? (
-            <EmptyState
-              title="No saved addresses"
-              message="Add a delivery address to continue."
-              emoji="📍"
-            />
           ) : (
             <FlatList
               data={addresses}
               keyExtractor={(item) => item.id}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.listContent}
               renderItem={({ item }) => (
                 <AddressCard
                   address={item}
@@ -146,14 +205,17 @@ export function AddressSelectionModal({
             />
           )}
 
-          {!showForm ? (
+          {!showForm && addresses && addresses.length > 0 ? (
             <View style={styles.footer}>
-              <Button title="+ Add New Address" variant="outline" onPress={() => setShowForm(true)} />
-              <Button title="Done" onPress={onClose} />
+              <PrimaryButton
+                title="+ إضافة عنوان جديد"
+                tone="outline"
+                onPress={() => setShowForm(true)}
+              />
             </View>
           ) : null}
-        </View>
-      </KeyboardAvoidingView>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
@@ -161,37 +223,70 @@ export function AddressSelectionModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    padding: spacing.lg,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
     maxHeight: '85%',
   },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+    paddingBottom: 12,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(150,150,150,0.2)',
+  },
   title: {
-    ...typography.h3,
-    color: colors.textPrimary,
-    marginBottom: spacing.md,
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  closeBtn: {
+    padding: 6,
+    borderRadius: 12,
+  },
+  formContainer: {
+    gap: 14,
+    paddingBottom: 12,
+  },
+  multilineInput: {
+    minHeight: 80,
+    textAlignVertical: 'top',
   },
   formError: {
-    ...typography.caption,
-    color: colors.error,
-    marginBottom: spacing.sm,
+    fontSize: 13,
+    textAlign: 'right',
+    marginTop: 4,
   },
-  formButtons: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.sm,
+  formActions: {
+    marginTop: 8,
+  },
+  skeletonWrap: {
+    gap: 12,
+    paddingVertical: 12,
+  },
+  skeletonItem: {
+    height: 96,
+    borderRadius: 20,
+  },
+  emptyWrap: {
+    paddingVertical: 20,
+  },
+  addFirstBtn: {
+    marginTop: 16,
+  },
+  listContent: {
+    paddingVertical: 8,
+    gap: 10,
   },
   footer: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    marginTop: spacing.md,
-  },
-  footerButton: {
-    flex: 1,
+    marginTop: 14,
   },
 });

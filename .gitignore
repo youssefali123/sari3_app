@@ -39,6 +39,9 @@ example
 # generated native folders
 /ios
 /android
+#specs
+spec_backups/
+spec_backups_v2/
 
 # local env files
 .env

@@ -16,6 +16,7 @@ import {
   LoadingState,
   PrimaryButton,
 } from '@/shared/ui/components';
+import { SkeletonCard } from '@/shared/ui/motion';
 
 const favoritesRepository: FavoritesRepository = new SupabaseFavoritesRepository();
 
@@ -52,7 +53,11 @@ export default function FavoriteStoresScreen() {
       />
 
       {isLoading || !customerId ? (
-        <LoadingState />
+        <View style={styles.listContent}>
+          {[0, 1, 2].map((idx) => (
+            <SkeletonCard key={idx} style={{ height: 110, borderRadius: 20 }} />
+          ))}
+        </View>
       ) : isError ? (
         <View style={styles.centerContainer}>
           <ErrorState

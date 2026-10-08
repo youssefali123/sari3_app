@@ -8,5 +8,5 @@ import { PressAnimationOptions } from '../hooks/usePressAnimation';
  * short-circuit, not by callers.
  */
 export const buttonPress: Required<Pick<PressAnimationOptions, 'pressedScale'>> = {
-  pressedScale: 0.97,
+  pressedScale: 0.95,
 };

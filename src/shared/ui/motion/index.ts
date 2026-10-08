@@ -24,6 +24,7 @@ export {
   type EntranceDirection,
   type EntranceOptions,
 } from './hooks/useEntranceAnimation';
+export { useSmoothKeyboardElevation } from './hooks/useSmoothKeyboardElevation';
 
 // Recipes
 export { buttonPress } from './recipes/buttonPress';
@@ -40,12 +41,17 @@ export {
   useSkeletonAnimation,
   SkeletonShapes,
   SkeletonShapesConfig,
+  SkeletonShape,
   SkeletonText,
   SkeletonImage,
   SkeletonCard,
   SkeletonItem,
   SkeletonProductCard,
   SkeletonStoreCard,
+  SkeletonOrderCard,
+  SkeletonOrderDetail,
+  SkeletonStoreDetail,
+  SkeletonProductDetail,
 } from './recipes/skeleton';
 export {
   loadingTransition,

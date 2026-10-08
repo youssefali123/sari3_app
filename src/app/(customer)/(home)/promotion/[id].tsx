@@ -8,7 +8,7 @@ import { Store } from '@/features/restaurants/domain/entities/Store';
 import { Product } from '@/features/products/domain/entities/Product';
 import { StoreCard } from '@/features/restaurants/presentation/StoreCard';
 import { ProductCard } from '@/features/products/presentation/ProductCard';
-import { LoadingSpinner } from '@/shared/ui/components/LoadingSpinner';
+import { SkeletonCard } from '@/shared/ui/motion';
 import { ErrorView } from '@/shared/ui/components/ErrorView';
 import { EmptyState } from '@/shared/ui/components/EmptyState';
 import { colors } from '@/shared/ui/theme/colors';
@@ -33,7 +33,13 @@ export default function PromotionDetailScreen() {
   });
 
   if (isLoading) {
-    return <LoadingSpinner />;
+    return (
+      <View style={[styles.container, { padding: spacing.md, gap: spacing.md }]}>
+        {[0, 1, 2, 3].map((idx) => (
+          <SkeletonCard key={idx} style={{ height: 110, borderRadius: 16 }} />
+        ))}
+      </View>
+    );
   }
 
   if (isError) {

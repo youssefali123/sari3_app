@@ -147,7 +147,8 @@ export function Button({
       onPressIn={onPressIn}
       onPressOut={onPressOut}
       disabled={isDisabled}
-      activeOpacity={0.7}
+      delayPressIn={0}
+      activeOpacity={0.8}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? text}
       accessibilityState={{ disabled: isDisabled, busy: loading }}

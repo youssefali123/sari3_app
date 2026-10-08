@@ -24,11 +24,10 @@ import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
 import { useColors } from '@/shared/ui/theme';
-import { AppHeader } from '@/shared/ui/components/AppHeader';
 import { Button } from '@/shared/ui/components/Button';
 import { EmptyState } from '@/shared/ui/components/EmptyState';
 import { Icon } from '@/shared/ui/components/Icon';
-import { PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
+import { AppScreen, BrandHeader, PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
 import { showAlert } from '@/shared/utils/alert';
 import { formatCurrencyCompact } from '@/shared/utils/formatting';
 
@@ -143,20 +142,20 @@ export default function CheckoutScreen() {
 
   if (items.length === 0 || !storeId) {
     return (
-      <View style={styles.container}>
-        <AppHeader title="الدفع" onBack={() => router.back()} />
+      <AppScreen>
+        <BrandHeader title="الدفع" onBack={() => router.back()} />
         <EmptyState
           emoji="🛒"
           title="مفيش حاجة للدفع"
           message="السلة فاضية. ضيف منتجات من متجر أولاً."
         />
-      </View>
+      </AppScreen>
     );
   }
 
   return (
-    <View style={styles.container}>
-      <AppHeader title="الدفع" onBack={() => router.back()} />
+    <AppScreen>
+      <BrandHeader title="الدفع" onBack={() => router.back()} />
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Delivery address */}
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>عنوان التوصيل</Text>
@@ -261,7 +260,7 @@ export default function CheckoutScreen() {
           setSelectedAddress(created);
         }}
       />
-    </View>
+    </AppScreen>
   );
 }
 

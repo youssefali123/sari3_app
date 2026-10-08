@@ -4,13 +4,13 @@ import {
   AnimatedStyle,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import { presets } from '../presets';
 import { useReducedMotion } from './useReducedMotion';
 
 export interface PressAnimationOptions {
-  /** Scale target while pressed (buttonPress ~0.97, cardPress ~0.99). */
+  /** Scale target while pressed (buttonPress ~0.95, cardPress ~0.98). */
   pressedScale?: number;
   /** Disabled controls never play the active press response (FR-004). */
   disabled?: boolean;
@@ -28,32 +28,36 @@ export interface PressAnimation {
 }
 
 /**
- * Shared press driver (feature 010 FR-003) — one Reanimated scale shared
- * value driven by `withTiming` on the UI thread. Disabled/loading branches
- * short-circuit structurally (no animation is scheduled at all).
+ * Shared press driver — responsive Reanimated scale with snappy spring rebound.
  */
 export function usePressAnimation(
   options: PressAnimationOptions = {},
 ): PressAnimation {
-  const { pressedScale = 0.97, disabled = false, loading = false } = options;
+  const {
+    pressedScale = 0.95,
+    disabled = false,
+    loading = false,
+  } = options;
   const reducedMotion = useReducedMotion();
   const scale = useSharedValue(1);
 
-  const { duration, easing } = presets.fastInteraction(reducedMotion);
-
   const onPressIn = useCallback(() => {
     if (disabled || loading) return;
-    // Reanimated shared values are mutable by design (UI-thread contract);
-    // the immutability rule's structural analysis can't see that.
-    // eslint-disable-next-line react-hooks/immutability
-    scale.value = withTiming(pressedScale, { duration, easing });
-  }, [disabled, loading, pressedScale, duration, easing, scale]);
+    if (reducedMotion) {
+      scale.value = pressedScale;
+    } else {
+      scale.value = withTiming(pressedScale, { duration: 60 });
+    }
+  }, [disabled, loading, reducedMotion, pressedScale, scale]);
 
   const onPressOut = useCallback(() => {
     if (disabled || loading) return;
-    // eslint-disable-next-line react-hooks/immutability
-    scale.value = withTiming(1, { duration, easing });
-  }, [disabled, loading, duration, easing, scale]);
+    if (reducedMotion) {
+      scale.value = 1;
+    } else {
+      scale.value = withSpring(1, { damping: 14, stiffness: 380 });
+    }
+  }, [disabled, loading, reducedMotion, scale]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -61,3 +65,4 @@ export function usePressAnimation(
 
   return { onPressIn, onPressOut, animatedStyle };
 }
+

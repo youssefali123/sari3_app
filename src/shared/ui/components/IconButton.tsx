@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, TouchableOpacity } from 'react-native';
+import { Pressable, StyleSheet } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { Icon } from './Icon';
 
@@ -46,18 +46,23 @@ export function IconButton({
   const iconColor = color ?? theme.colors.textPrimary;
 
   return (
-    <TouchableOpacity
-      style={[styles.base, disabled && styles.disabled]}
+    <Pressable
+      style={({ pressed }) => [
+        styles.base,
+        disabled && styles.disabled,
+        pressed && !disabled && { opacity: 0.75, transform: [{ scale: 0.92 }] },
+      ]}
       onPress={onPress}
+      unstable_pressDelay={0}
+      hitSlop={6}
       disabled={disabled}
-      activeOpacity={0.7}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}
       testID={testID}
     >
       <Icon name={name} size={iconSize} color={iconColor} accessibilityHidden />
-    </TouchableOpacity>
+    </Pressable>
   );
 }
 

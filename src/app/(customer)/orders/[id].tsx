@@ -12,12 +12,12 @@ import { OrderStatus } from '@/features/orders/domain/entities/OrderStatus';
 import { useReorder } from '@/features/orders/application/hooks/useReorder';
 import { ScopedDriverCard } from '@/features/orders/presentation/ScopedDriverCard';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
-import { LoadingSpinner } from '@/shared/ui/components/LoadingSpinner';
+import { SkeletonOrderDetail } from '@/shared/ui/motion';
 import { ErrorView } from '@/shared/ui/components/ErrorView';
 import { ConfirmDialog } from '@/shared/ui/components/ConfirmDialog';
 import { showAlert } from '@/shared/utils/alert';
 import { useColors, useTheme } from '@/shared/ui/theme';
-import { BrandHeader, EmptyState, PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
+import { AppScreen, BrandHeader, EmptyState, PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
 import { Icon } from '@/shared/ui/components/Icon';
 import { formatCurrency, formatDateTime } from '@/shared/utils/formatting';
 
@@ -122,16 +122,16 @@ export default function OrderDetailScreen() {
 
   if (isLoading) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppScreen>
         <BrandHeader title="تفاصيل الطلب" onBack={() => router.back()} />
-        <LoadingSpinner />
-      </View>
+        <SkeletonOrderDetail />
+      </AppScreen>
     );
   }
 
   if (isError || !order) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppScreen>
         <BrandHeader title="تفاصيل الطلب" onBack={() => router.back()} />
         <View style={styles.errorContent}>
           <EmptyState
@@ -141,7 +141,7 @@ export default function OrderDetailScreen() {
           />
           <PrimaryButton title="حاول مرة أخرى" onPress={() => void refetch()} />
         </View>
-      </View>
+      </AppScreen>
     );
   }
 
@@ -149,7 +149,7 @@ export default function OrderDetailScreen() {
   const currentIndex = STATUS_PROGRESSION.indexOf(order.status);
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <AppScreen>
       <BrandHeader title="تتبع الطلب" onBack={() => router.back()} />
       <ScrollView
         contentContainerStyle={styles.content}
@@ -416,7 +416,7 @@ export default function OrderDetailScreen() {
         }}
         onCancel={() => setHideConfirmVisible(false)}
       />
-    </View>
+    </AppScreen>
   );
 }
 

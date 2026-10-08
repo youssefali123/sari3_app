@@ -33,6 +33,7 @@ import {
   SectionTitle,
   Surface,
 } from '@/shared/ui/components';
+import { SkeletonProductDetail } from '@/shared/ui/motion';
 import { formatCurrency } from '@/shared/utils/formatting';
 
 const productRepository: ProductRepository = new SupabaseProductRepository();
@@ -171,7 +172,7 @@ export default function ProductDetailScreen() {
     return (
       <AppScreen>
         <BrandHeader title="جاري التحميل…" onBack={() => router.back()} />
-        <LoadingState />
+        <SkeletonProductDetail />
       </AppScreen>
     );
   }

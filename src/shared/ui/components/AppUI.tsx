@@ -156,6 +156,7 @@ export function BrandHeader({
           accessibilityRole="button"
           accessibilityLabel="رجوع"
           onPress={onBack}
+          unstable_pressDelay={0}
           hitSlop={8}
           style={({ pressed }) => [
             styles.headerIcon,
@@ -164,7 +165,7 @@ export function BrandHeader({
               borderWidth: 1,
               borderColor: colors.border,
               opacity: pressed ? 0.75 : 1,
-              transform: [{ scale: pressed ? 0.94 : 1 }],
+              transform: [{ scale: pressed ? 0.91 : 1 }],
             },
           ]}
           testID="header-back"
@@ -228,7 +229,13 @@ export function SectionTitle({
   return (
     <View style={styles.sectionTitle}>
       {action ? (
-        <Pressable onPress={onAction} testID={`section-${title}-action`}>
+        <Pressable
+          onPress={onAction}
+          unstable_pressDelay={0}
+          hitSlop={6}
+          style={({ pressed }) => [pressed && { opacity: 0.65 }]}
+          testID={`section-${title}-action`}
+        >
           <Text
             style={[
               styles.sectionAction,
@@ -293,14 +300,15 @@ export function PrimaryButton({
       accessibilityRole="button"
       disabled={disabled || loading}
       onPress={onPress}
+      unstable_pressDelay={0}
       testID={testID}
       style={({ pressed }) => [
         styles.primaryButton,
         {
           backgroundColor: background,
           borderColor: tone === 'outline' ? colors.border : background,
-          opacity: disabled ? 0.5 : pressed ? 0.86 : 1,
-          transform: [{ scale: pressed ? 0.985 : 1 }],
+          opacity: disabled ? 0.5 : pressed ? 0.88 : 1,
+          transform: [{ scale: pressed && !disabled && !loading ? 0.95 : 1 }],
         },
       ]}
     >
@@ -342,6 +350,7 @@ export function IconButton({
       accessibilityRole="button"
       accessibilityLabel={label}
       onPress={onPress}
+      unstable_pressDelay={0}
       testID={testID}
       hitSlop={8}
       style={({ pressed }) => [
@@ -351,7 +360,7 @@ export function IconButton({
           borderWidth: 1,
           borderColor: colors.border,
           opacity: pressed ? 0.75 : 1,
-          transform: [{ scale: pressed ? 0.94 : 1 }],
+          transform: [{ scale: pressed ? 0.91 : 1 }],
         },
       ]}
     >
@@ -446,11 +455,12 @@ export function ProfileRow({
   return (
     <Pressable
       onPress={onPress}
+      unstable_pressDelay={0}
       disabled={!onPress}
       style={({ pressed }) => [
         styles.profileRow,
         { borderBottomColor: colors.border },
-        pressed && { opacity: 0.7 },
+        pressed && { opacity: 0.75, transform: [{ scale: 0.985 }] },
       ]}
     >
       <View style={[styles.profileRowIcon, { backgroundColor: isDestructive ? colors.destructive + '15' : colors.muted }]}>

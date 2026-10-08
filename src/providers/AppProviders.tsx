@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { Provider } from 'react-redux';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { store } from '@/shared/lib/store';
+import { store, initializeCartPersistence } from '@/shared/lib/store';
 import { queryClient } from '@/shared/lib/queryClient';
 import { AuthProvider } from '@/features/auth/application/context/AuthContext';
 import { ThemeProvider } from '@/shared/ui/context/ThemeContext';
@@ -19,6 +19,10 @@ interface AppProvidersProps {
  * everything so gesture-based components work app-wide.
  */
 export function AppProviders({ children }: AppProvidersProps) {
+  useEffect(() => {
+    void initializeCartPersistence();
+  }, []);
+
   return (
     <ThemeProvider>
       <GestureHandlerRootView style={{ flex: 1 }}>

@@ -39,6 +39,7 @@ import {
   SectionTitle,
   Surface,
 } from '@/shared/ui/components';
+import { SkeletonStoreDetail, SkeletonItem } from '@/shared/ui/motion';
 import { formatCurrency } from '@/shared/utils/formatting';
 
 const storeRepository: StoreRepository = new SupabaseStoreRepository();
@@ -126,7 +127,7 @@ export default function StoreDetailScreen() {
     return (
       <AppScreen>
         <BrandHeader title="جاري التحميل…" onBack={() => router.back()} />
-        <LoadingState />
+        <SkeletonStoreDetail />
       </AppScreen>
     );
   }
@@ -335,7 +336,11 @@ export default function StoreDetailScreen() {
 
         {/* Products List */}
         {productsQuery.isLoading ? (
-          <LoadingState />
+          <View style={styles.productsList}>
+            {[0, 1, 2, 3].map((idx) => (
+              <SkeletonItem key={idx} />
+            ))}
+          </View>
         ) : filteredProducts.length === 0 ? (
           <EmptyState
             title="لا توجد منتجات في هذا القسم"

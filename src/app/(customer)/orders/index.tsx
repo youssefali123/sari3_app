@@ -8,10 +8,9 @@ import { OrderSummaryCard } from '@/features/orders/presentation/OrderSummaryCar
 import { useReorder } from '@/features/orders/application/hooks/useReorder';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
-import { LoadingSpinner } from '@/shared/ui/components/LoadingSpinner';
 import { ErrorView } from '@/shared/ui/components/ErrorView';
-import { EmptyState } from '@/shared/ui/components/AppUI';
-import { BrandHeader } from '@/shared/ui/components/AppUI';
+import { SkeletonOrderCard } from '@/shared/ui/motion';
+import { AppScreen, BrandHeader, EmptyState } from '@/shared/ui/components/AppUI';
 import { ConfirmDialog } from '@/shared/ui/components/ConfirmDialog';
 import { showAlert } from '@/shared/utils/alert';
 import { useColors, useTheme } from '@/shared/ui/theme';
@@ -49,6 +48,11 @@ export default function OrderHistoryScreen() {
     });
   }, [orders, showHistory]);
 
+  const subtitleText = useMemo(() => {
+    if (orders.length === 0) return 'تابع طلباتك بكل سهولة';
+    return `${filteredOrders.length} ${showHistory ? 'طلب سابق' : 'طلب حالي'}`;
+  }, [orders.length, filteredOrders.length, showHistory]);
+
   const hideOrder = async (orderId: string) => {
     try {
       await orderRepository.hideOrder(orderId);
@@ -60,25 +64,29 @@ export default function OrderHistoryScreen() {
 
   if (isLoading || !customerId) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppScreen>
         <BrandHeader title="طلباتي" subtitle="تابع طلباتك بكل سهولة" />
-        <LoadingSpinner />
-      </View>
+        <View style={styles.listContent}>
+          {[0, 1, 2].map((idx) => (
+            <SkeletonOrderCard key={idx} />
+          ))}
+        </View>
+      </AppScreen>
     );
   }
 
   if (isError) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <AppScreen>
         <BrandHeader title="طلباتي" subtitle="تابع طلباتك بكل سهولة" />
         <ErrorView message="تعذر تحميل الطلبات." onRetry={refetch} />
-      </View>
+      </AppScreen>
     );
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <BrandHeader title="طلباتي" subtitle="تابع طلباتك بكل سهولة" />
+    <AppScreen>
+      <BrandHeader title="طلباتي" subtitle={subtitleText} />
 
       {/* Segmented Control from SOURCE */}
       <View style={styles.segmentWrap}>
@@ -165,7 +173,7 @@ export default function OrderHistoryScreen() {
         }}
         onCancel={() => setHideTargetId(null)}
       />
-    </View>
+    </AppScreen>
   );
 }
 

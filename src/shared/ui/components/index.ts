@@ -29,6 +29,9 @@ export { StickyBar } from './StickyBar';
 export { RatingPill } from './RatingPill';
 export { OptionRow } from './OptionRow';
 
+export { TabBarButton } from './TabBarButton';
+export type { TabBarButtonProps } from './TabBarButton';
+
 // AppUI primitives (SOURCE project parity)
 export {
   AppScreen,

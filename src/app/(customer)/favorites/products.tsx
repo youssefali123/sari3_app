@@ -18,6 +18,7 @@ import {
   LoadingState,
   PrimaryButton,
 } from '@/shared/ui/components';
+import { SkeletonItem } from '@/shared/ui/motion';
 
 const favoritesRepository: FavoritesRepository = new SupabaseFavoritesRepository();
 const storeRepository: StoreRepository = new SupabaseStoreRepository();
@@ -61,7 +62,11 @@ export default function FavoriteProductsScreen() {
       />
 
       {isLoading || !customerId ? (
-        <LoadingState />
+        <View style={styles.listContent}>
+          {[0, 1, 2].map((idx) => (
+            <SkeletonItem key={idx} />
+          ))}
+        </View>
       ) : isError ? (
         <View style={styles.centerContainer}>
           <ErrorState

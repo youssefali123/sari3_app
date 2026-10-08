@@ -6,5 +6,5 @@ import { PressAnimationOptions } from '../hooks/usePressAnimation';
  * never animate; non-interactive cards MUST NOT use this recipe.
  */
 export const cardPress: Required<Pick<PressAnimationOptions, 'pressedScale'>> = {
-  pressedScale: 0.99,
+  pressedScale: 0.98,
 };

@@ -158,6 +158,21 @@ export const cartSlice = createSlice({
       }
       state.conflictState = initialState.conflictState;
     },
+
+    /** Rehydrates persisted cart from AsyncStorage on startup. */
+    hydrateCart(
+      state,
+      action: PayloadAction<{
+        storeId: string | null;
+        storeName: string | null;
+        items: CartItem[];
+      }>,
+    ) {
+      state.storeId = action.payload.storeId;
+      state.storeName = action.payload.storeName;
+      state.items = action.payload.items;
+      state.conflictState = initialState.conflictState;
+    },
   },
 });
 
@@ -172,6 +187,7 @@ export const {
   clearAndSetBatch,
   setConflictBatchPrompt,
   confirmBatchReplace,
+  hydrateCart,
 } = cartSlice.actions;
 
 // Selectors

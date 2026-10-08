@@ -13,9 +13,7 @@ import {
 } from '@/features/cart/application/cartSlice';
 import { useAppDispatch, useAppSelector } from '@/shared/lib/store';
 import { useColors, useTheme } from '@/shared/ui/theme';
-import { AppHeader } from '@/shared/ui/components/AppHeader';
-import { EmptyState } from '@/shared/ui/components/AppUI';
-import { PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
+import { AppScreen, BrandHeader, EmptyState, PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
 import { StickyBar } from '@/shared/ui/components/StickyBar';
 import { formatCurrencyCompact } from '@/shared/utils/formatting';
 
@@ -43,8 +41,8 @@ export default function CartScreen() {
 
   if (items.length === 0) {
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
-        <AppHeader title="سلة الطلبات" subtitle="راجع طلبك قبل التأكيد" />
+      <AppScreen>
+        <BrandHeader title="سلة الطلبات" subtitle="راجع طلبك قبل التأكيد" />
         <View style={styles.emptyContainer}>
           <EmptyState
             title="سلتك فارغة"
@@ -59,13 +57,16 @@ export default function CartScreen() {
             />
           </View>
         </View>
-      </View>
+      </AppScreen>
     );
   }
 
+  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const subtitle = `${itemCount} ${itemCount === 1 ? 'صنف' : itemCount === 2 ? 'صنفان' : 'أصناف'}`;
+
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <AppHeader title="سلة الطلبات" subtitle="راجع طلبك قبل التأكيد" />
+    <AppScreen>
+      <BrandHeader title="سلة الطلبات" subtitle={subtitle} />
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
@@ -123,7 +124,7 @@ export default function CartScreen() {
       </StickyBar>
 
       <StoreConflictModal />
-    </View>
+    </AppScreen>
   );
 }
 
