@@ -17,12 +17,14 @@ import { AddressRepository } from '@/features/addresses/domain/repositories/Addr
 import { SupabaseAddressRepository } from '@/features/addresses/infrastructure/SupabaseAddressRepository';
 import { AddressCard } from '@/features/addresses/presentation/AddressCard';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
+import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import Animated from 'react-native-reanimated';
 import { Input } from '@/shared/ui/components/Input';
 import { SkeletonCard, useSmoothKeyboardElevation } from '@/shared/ui/motion';
 import { ErrorView } from '@/shared/ui/components/ErrorView';
 import { ConfirmDialog } from '@/shared/ui/components/ConfirmDialog';
+import { AuthRequiredView } from '@/shared/ui/components/AuthRequiredModal';
 import { Icon } from '@/shared/ui/components/Icon';
 import {
   AppScreen,
@@ -49,6 +51,7 @@ interface EditingState {
 export default function SavedAddressesScreen() {
   useRequireAuth('/(customer)/addresses');
   const router = useRouter();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const customerId = useCurrentCustomerId();
   const queryClient = useQueryClient();
   const colors = useColors();
@@ -133,7 +136,21 @@ export default function SavedAddressesScreen() {
       ? `${addresses.length} ${addresses.length === 1 ? 'عنوان مسجل' : 'عناوين مسجلة'}`
       : 'إدارة مواقع التوصيل';
 
-  if (isLoading || !customerId) {
+  if (!isAuthLoading && !user) {
+    return (
+      <AppScreen>
+        <BrandHeader title="عناويني المحفوظة" subtitle="إدارة مواقع التوصيل" onBack={() => router.back()} />
+        <AuthRequiredView
+          icon="MapPin"
+          title="التسجيل مطلوب"
+          message="سجّل دخولك لإضافة وحفظ عناوين التوصيل لتسهيل وتسريع طلباتك."
+          returnTo="/(customer)/addresses"
+        />
+      </AppScreen>
+    );
+  }
+
+  if (isLoading) {
     return (
       <AppScreen>
         <BrandHeader title="عناويني المحفوظة" subtitle="جاري التحميل..." onBack={() => router.back()} />
@@ -248,7 +265,11 @@ export default function SavedAddressesScreen() {
               </Text>
             </View>
 
-            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.formContent}>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="always"
+              contentContainerStyle={styles.formContent}
+            >
               <Input
                 label="تسمية العنوان"
                 value={label}
@@ -317,7 +338,10 @@ export default function SavedAddressesScreen() {
                 <PrimaryButton
                   title={editing?.address ? 'حفظ التعديلات' : 'حفظ العنوان'}
                   icon="checkmark-circle-outline"
-                  onPress={() => saveMutation.mutate()}
+                  onPress={() => {
+                    Keyboard.dismiss();
+                    saveMutation.mutate();
+                  }}
                   loading={saveMutation.isPending}
                   testID="save-address-btn"
                 />

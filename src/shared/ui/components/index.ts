@@ -21,6 +21,8 @@ export { LoadingState } from './LoadingState';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
 export { Sari3BottomSheet } from './Sari3BottomSheet';
+export { ConfirmDialog } from './ConfirmDialog';
+export { AuthRequiredModal, AuthRequiredView } from './AuthRequiredModal';
 
 // Feature 011 design-identity components (shared across Phase 3 screens)
 export { AppHeader } from './AppHeader';

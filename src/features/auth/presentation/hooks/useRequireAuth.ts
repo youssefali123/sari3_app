@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback } from 'react';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../application/hooks/useAuth';
 
@@ -19,16 +19,6 @@ export function useRequireAuth(returnToOrOptions: string | UseRequireAuthOptions
     typeof returnToOrOptions === 'string' ? { returnTo: returnToOrOptions } : returnToOrOptions;
   const { user, isLoading } = useAuth();
   const router = useRouter();
-  const redirectSentRef = useRef(false);
-
-  useEffect(() => {
-    if (isLoading || user || redirectSentRef.current) return;
-    redirectSentRef.current = true;
-    router.push({
-      pathname: '/(auth)/login',
-      params: { returnTo: options.returnTo ?? '' },
-    });
-  }, [isLoading, user, router, options.returnTo]);
 
   /** Action-level guard: call before a protected action; returns whether it may proceed. */
   const requireAuth = useCallback(

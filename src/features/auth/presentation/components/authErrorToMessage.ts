@@ -7,18 +7,18 @@ import { AuthErrorType } from '../../domain/repositories/AuthRepository';
 export function authErrorToMessage(error: AuthErrorType): string {
   switch (error.kind) {
     case 'invalid_credentials':
-      return 'Incorrect email or password.';
+      return 'البريد الإلكتروني أو كلمة المرور غير صحيحة.';
     case 'email_already_registered':
-      return 'This email is already registered. Try logging in instead.';
+      return 'هذا البريد الإلكتروني مسجل بالفعل. يرجى تسجيل الدخول.';
     case 'weak_password':
-      return 'Password must be at least 6 characters.';
+      return 'يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.';
     case 'email_not_confirmed':
-      return 'Please confirm your email first — check your inbox for the confirmation email.';
+      return 'يرجى تأكيد بريدك الإلكتروني أولاً عبر الرابط المرسل إليك.';
     case 'invalid_confirmation_code':
-      return 'That code is incorrect or has expired. Please try again.';
+      return 'رمز التأكيد غير صحيح أو انتهت صلاحيته. يرجى المحاولة مجدداً.';
     case 'network_error':
-      return 'No internet connection. Please check your network and try again.';
+      return 'تعذر الاتصال بالإنترنت. يرجى التحقق من الشبكة والمحاولة مجدداً.';
     case 'unknown':
-      return 'Something went wrong. Please try again.';
+      return 'حدث خطأ غير متوقع. يرجى المحاولة لاحقاً.';
   }
 }

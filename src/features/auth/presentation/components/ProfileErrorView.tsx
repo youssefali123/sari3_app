@@ -1,28 +1,57 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useAuth } from '../../application/hooks/useAuth';
-import { Button } from '@/shared/ui/components/Button';
-import { colors } from '@/shared/ui/theme/colors';
-import { spacing } from '@/shared/ui/theme/spacing';import { typography } from '@/shared/ui/theme/typography';
+import { Icon } from '@/shared/ui/components/Icon';
+import { PrimaryButton } from '@/shared/ui/components/AppUI';
+import { useColors, useTheme } from '@/shared/ui/theme';
 
 /**
- * Rendered when an authenticated user's profile row cannot be loaded
- * (rare trigger-failure or database-inconsistency edge case). Offers a
- * profile re-fetch and a clean way out of the broken session.
+ * Rendered when an authenticated user's profile row cannot be loaded.
+ * Tailored to Sari3 brand identity with Arabic typography and semantic styling.
  */
 export function ProfileErrorView() {
   const { refreshProfile, signOut } = useAuth();
+  const colors = useColors();
+  const { theme } = useTheme();
 
   return (
-    <View style={styles.container}>
-      <Text style={styles.emoji}>⚠️</Text>
-      <Text style={styles.title}>Account Setup Incomplete</Text>
-      <Text style={styles.description}>
-        Your profile could not be loaded. This may be a temporary issue.
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.iconBadge, { backgroundColor: 'rgba(201, 79, 72, 0.12)', borderColor: 'rgba(201, 79, 72, 0.25)' }]}>
+        <Icon name="TriangleAlert" size={32} color={colors.destructive} />
+      </View>
+      <Text
+        style={[
+          styles.title,
+          {
+            color: colors.foreground,
+            fontFamily: theme.typography.headingMedium.fontFamily,
+          },
+        ]}
+      >
+        تعذر تحميل بيانات الحساب
+      </Text>
+      <Text
+        style={[
+          styles.description,
+          {
+            color: colors.mutedForeground,
+            fontFamily: theme.typography.bodyMedium.fontFamily,
+          },
+        ]}
+      >
+        حدث خطأ غير متوقع أثناء تحميل بيانات ملفك الشخصي. يرجى إعادة المحاولة أو تسجيل الخروج.
       </Text>
       <View style={styles.actions}>
-        <Button title="Retry" onPress={() => void refreshProfile()} />
-        <Button title="Sign Out" variant="outline" onPress={() => void signOut()} />
+        <PrimaryButton
+          title="إعادة المحاولة"
+          icon="refresh-outline"
+          onPress={() => void refreshProfile()}
+        />
+        <PrimaryButton
+          title="تسجيل الخروج"
+          tone="outline"
+          onPress={() => void signOut()}
+        />
       </View>
     </View>
   );
@@ -33,27 +62,33 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: spacing.xl,
-    backgroundColor: colors.background,
+    padding: 24,
   },
-  emoji: {
-    fontSize: 48,
-    marginBottom: spacing.md,
+  iconBadge: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
   },
   title: {
-    ...typography.h2,
-    color: colors.textPrimary,
+    fontSize: 20,
+    fontWeight: '700',
     textAlign: 'center',
+    marginBottom: 8,
   },
   description: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 22,
     textAlign: 'center',
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
+    marginBottom: 28,
+    maxWidth: 320,
   },
   actions: {
-    flexDirection: 'row',
-    gap: spacing.sm,
+    width: '100%',
+    maxWidth: 300,
+    gap: 12,
   },
 });

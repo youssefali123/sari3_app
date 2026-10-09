@@ -24,7 +24,10 @@ export {
   type EntranceDirection,
   type EntranceOptions,
 } from './hooks/useEntranceAnimation';
-export { useSmoothKeyboardElevation } from './hooks/useSmoothKeyboardElevation';
+export {
+  useSmoothKeyboardElevation,
+  type UseSmoothKeyboardElevationOptions,
+} from './hooks/useSmoothKeyboardElevation';
 
 // Recipes
 export { buttonPress } from './recipes/buttonPress';

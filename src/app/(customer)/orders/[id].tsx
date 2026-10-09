@@ -12,12 +12,14 @@ import { OrderStatus } from '@/features/orders/domain/entities/OrderStatus';
 import { useReorder } from '@/features/orders/application/hooks/useReorder';
 import { ScopedDriverCard } from '@/features/orders/presentation/ScopedDriverCard';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
+import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { SkeletonOrderDetail } from '@/shared/ui/motion';
 import { ErrorView } from '@/shared/ui/components/ErrorView';
 import { ConfirmDialog } from '@/shared/ui/components/ConfirmDialog';
 import { showAlert } from '@/shared/utils/alert';
 import { useColors, useTheme } from '@/shared/ui/theme';
 import { AppScreen, BrandHeader, EmptyState, PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
+import { AuthRequiredView } from '@/shared/ui/components/AuthRequiredModal';
 import { Icon } from '@/shared/ui/components/Icon';
 import { formatCurrency, formatDateTime } from '@/shared/utils/formatting';
 
@@ -63,6 +65,7 @@ export default function OrderDetailScreen() {
   const orderId = id as string;
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const reorder = useReorder();
   const { theme } = useTheme();
   const colors = useColors();
@@ -119,6 +122,20 @@ export default function OrderDetailScreen() {
       showAlert('تعذر إخفاء الطلب', error instanceof Error ? error.message : 'حاول مرة أخرى.');
     }
   };
+
+  if (!isAuthLoading && !user) {
+    return (
+      <AppScreen>
+        <BrandHeader title="تفاصيل الطلب" onBack={() => router.back()} />
+        <AuthRequiredView
+          icon="ReceiptText"
+          title="التسجيل مطلوب"
+          message="سجّل دخولك للوصول إلى تفاصيل هذا الطلب."
+          returnTo={`/(customer)/orders/${orderId}`}
+        />
+      </AppScreen>
+    );
+  }
 
   if (isLoading) {
     return (

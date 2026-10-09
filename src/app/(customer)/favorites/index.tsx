@@ -14,11 +14,13 @@ import { FavoriteStoreCard } from '@/features/favorites/presentation/FavoriteSto
 import { FavoriteProductCard } from '@/features/favorites/presentation/FavoriteProductCard';
 import { useSelectedArea } from '@/features/areas/application/hooks/useSelectedArea';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
+import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { useColors } from '@/shared/ui/hooks/useColors';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
 import {
   AppScreen,
+  AuthRequiredView,
   BrandHeader,
   EmptyState,
   ErrorState,
@@ -53,6 +55,7 @@ export default function FavoritesScreen() {
   const router = useRouter();
   const colors = useColors();
   const { theme } = useTheme();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const [tab, setTab] = useState<FavoritesTab>('restaurants');
   const customerId = useCurrentCustomerId();
   const { selectedAreaId, selectedAreaName } = useSelectedArea();
@@ -128,6 +131,20 @@ export default function FavoritesScreen() {
     </ListCell>
   );
 
+  if (!isAuthLoading && !user) {
+    return (
+      <AppScreen>
+        <BrandHeader title="المفضلة" subtitle="كل اختياراتك المحببة" />
+        <AuthRequiredView
+          icon="Heart"
+          title="التسجيل مطلوب"
+          message="سجّل دخولك للوصول إلى قائمتك المفضلة وحفظ المطاعم والأطباق التي تحبها."
+          returnTo="/(customer)/favorites"
+        />
+      </AppScreen>
+    );
+  }
+
   return (
     <AppScreen>
       <BrandHeader title="المفضلة" subtitle="كل اختياراتك المحببة" />
@@ -166,7 +183,7 @@ export default function FavoritesScreen() {
         </View>
       </View>
 
-      {isLoading || !customerId ? (
+      {isLoading ? (
         <View style={styles.listContent}>
           {[0, 1, 2].map((i) => (
             <SkeletonCard

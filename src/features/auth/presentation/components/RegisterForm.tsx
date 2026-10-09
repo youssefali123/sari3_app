@@ -1,29 +1,33 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Keyboard, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../application/hooks/useAuth';
 import { authErrorToMessage } from './authErrorToMessage';
 import { navigateAfterAuth } from './postAuthRouting';
 import { Input } from '@/shared/ui/components/Input';
-import { Button } from '@/shared/ui/components/Button';
-import { colors } from '@/shared/ui/theme/colors';
-import { spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
+import { PrimaryButton } from '@/shared/ui/components/AppUI';
+import { Icon } from '@/shared/ui/components/Icon';
+import { useColors, useTheme } from '@/shared/ui/theme';
 
 interface RegisterFormProps {
   returnTo?: string;
 }
 
 /**
- * Registration form: email + password + full name. No role selector —
- * every self-registered account is a customer server-side (FR-006).
+ * Registration form: email + password + full name.
+ * Styled to match Sari3 brand identity with Arabic typography,
+ * password visibility toggling, leading icons, and validation.
  */
 export function RegisterForm({ returnTo = '' }: RegisterFormProps) {
   const { signUp, refreshProfile } = useAuth();
   const router = useRouter();
+  const colors = useColors();
+  const { theme } = useTheme();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmationPending, setConfirmationPending] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -44,13 +48,17 @@ export function RegisterForm({ returnTo = '' }: RegisterFormProps) {
   }
 
   async function handleSubmit() {
-    // Client-side validation fires before signUp for instant feedback (FR-015).
+    Keyboard.dismiss();
     if (fullName.trim().length === 0) {
-      setError('Full name is required.');
+      setError('يرجى إدخال الاسم الكامل.');
+      return;
+    }
+    if (email.trim().length === 0) {
+      setError('يرجى إدخال البريد الإلكتروني.');
       return;
     }
     if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
+      setError('يجب أن تتكون كلمة المرور من 6 أحرف على الأقل.');
       return;
     }
     setError(null);
@@ -62,7 +70,6 @@ export function RegisterForm({ returnTo = '' }: RegisterFormProps) {
       return;
     }
     if ('confirmationRequired' in result.data) {
-      // Only reachable when email confirmation is re-enabled server-side.
       setConfirmationPending(true);
       setSubmitting(false);
       return;
@@ -73,14 +80,43 @@ export function RegisterForm({ returnTo = '' }: RegisterFormProps) {
 
   if (confirmationPending) {
     return (
-      <View>
-        <Text style={styles.confirmationTitle}>Account created!</Text>
-        <Text style={styles.confirmationText}>
-          Please check your email to confirm your account before signing in.
+      <View style={styles.confirmationWrap}>
+        <View
+          style={[
+            styles.successBadge,
+            {
+              backgroundColor: colors.primarySubtle,
+              borderColor: 'rgba(245, 189, 22, 0.4)',
+            },
+          ]}
+        >
+          <Icon name="Mail" size={32} color={colors.primaryPressed} />
+        </View>
+        <Text
+          style={[
+            styles.confirmationTitle,
+            {
+              color: colors.foreground,
+              fontFamily: theme.typography.headingMedium.fontFamily,
+            },
+          ]}
+        >
+          تم إنشاء الحساب بنجاح!
         </Text>
-        <Button
-          title="Back to Login"
-          variant="outline"
+        <Text
+          style={[
+            styles.confirmationText,
+            {
+              color: colors.mutedForeground,
+              fontFamily: theme.typography.bodyMedium.fontFamily,
+            },
+          ]}
+        >
+          يرجى مراجعة بريدك الإلكتروني لتأكيد حسابك قبل تسجيل الدخول.
+        </Text>
+        <PrimaryButton
+          title="الانتقال لتسجيل الدخول"
+          tone="primary"
           onPress={() =>
             router.replace({
               pathname: '/(auth)/login',
@@ -93,76 +129,196 @@ export function RegisterForm({ returnTo = '' }: RegisterFormProps) {
   }
 
   return (
-    <View>
+    <View style={styles.form}>
       <Input
-        label="Full Name"
+        label="الاسم الكامل"
         value={fullName}
         onChangeText={updateFullName}
         autoComplete="name"
-        placeholder="e.g. Ahmed Hassan"
+        placeholder="مثال: أحمد محمد"
+        leadingIcon={<Icon name="User" size={18} color={colors.mutedForeground} />}
+        testID="register-name-input"
       />
+
       <Input
-        label="Email"
+        label="البريد الإلكتروني"
         value={email}
         onChangeText={updateEmail}
         keyboardType="email-address"
         autoCapitalize="none"
         autoComplete="email"
-        placeholder="you@example.com"
+        placeholder="name@example.com"
+        leadingIcon={<Icon name="Mail" size={18} color={colors.mutedForeground} />}
+        style={styles.ltrInput}
+        testID="register-email-input"
       />
+
       <Input
-        label="Password"
+        label="كلمة المرور"
         value={password}
         onChangeText={updatePassword}
-        secureTextEntry
+        secureTextEntry={!showPassword}
         autoComplete="new-password"
-        placeholder="At least 6 characters"
-      />
-      {error ? <Text style={styles.error}>{error}</Text> : null}
-      <Button
-        title="Create Account"
-        onPress={() => void handleSubmit()}
-        loading={submitting}
-        disabled={!email.trim() || !password || !fullName.trim()}
-      />
-      <Text
-        style={styles.loginLink}
-        onPress={() =>
-          router.push({
-            pathname: '/(auth)/login',
-            params: { returnTo },
-          })
+        placeholder="6 أحرف على الأقل"
+        leadingIcon={<Icon name="Lock" size={18} color={colors.mutedForeground} />}
+        trailingAction={
+          <Pressable
+            onPress={() => setShowPassword((prev) => !prev)}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={showPassword ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+          >
+            <Icon
+              name={showPassword ? 'EyeOff' : 'Eye'}
+              size={18}
+              color={colors.mutedForeground}
+            />
+          </Pressable>
         }
-      >
-        Already have an account? Sign in
-      </Text>
+        style={styles.ltrInput}
+        testID="register-password-input"
+      />
+
+      {error ? (
+        <View
+          style={[
+            styles.errorBanner,
+            {
+              backgroundColor: 'rgba(201, 79, 72, 0.1)',
+              borderColor: 'rgba(201, 79, 72, 0.25)',
+            },
+          ]}
+        >
+          <Icon name="TriangleAlert" size={16} color={colors.destructive} />
+          <Text
+            style={[
+              styles.errorText,
+              {
+                color: colors.destructive,
+                fontFamily: theme.typography.caption.fontFamily,
+              },
+            ]}
+          >
+            {error}
+          </Text>
+        </View>
+      ) : null}
+
+      <View style={styles.submitWrap}>
+        <PrimaryButton
+          title="إنشاء حساب جديد"
+          icon="checkmark-circle-outline"
+          onPress={() => void handleSubmit()}
+          loading={submitting}
+          disabled={!email.trim() || !password || !fullName.trim()}
+          testID="register-submit-button"
+        />
+      </View>
+
+      <View style={styles.switchRow}>
+        <Text
+          style={[
+            styles.switchLabel,
+            {
+              color: colors.mutedForeground,
+              fontFamily: theme.typography.bodyMedium.fontFamily,
+            },
+          ]}
+        >
+          لديك حساب بالفعل؟
+        </Text>
+        <Pressable
+          onPress={() =>
+            router.push({
+              pathname: '/(auth)/login',
+              params: { returnTo },
+            })
+          }
+          hitSlop={6}
+        >
+          <Text
+            style={[
+              styles.switchAction,
+              {
+                color: colors.primaryPressed,
+                fontFamily: theme.typography.button.fontFamily,
+              },
+            ]}
+          >
+            تسجيل الدخول
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  error: {
-    ...typography.bodySmall,
-    color: colors.error,
-    marginBottom: spacing.sm,
+  form: {
+    gap: 4,
   },
-  loginLink: {
-    ...typography.bodySmall,
-    color: colors.primary,
-    fontWeight: '600',
-    textAlign: 'center',
-    marginTop: spacing.md,
+  ltrInput: {
+    textAlign: 'left',
+  },
+  errorBanner: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  errorText: {
+    fontSize: 13,
+    flex: 1,
+    textAlign: 'right',
+  },
+  submitWrap: {
+    marginTop: 12,
+  },
+  switchRow: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 20,
+    paddingTop: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(150, 150, 150, 0.2)',
+  },
+  switchLabel: {
+    fontSize: 14,
+  },
+  switchAction: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
+  confirmationWrap: {
+    alignItems: 'center',
+    paddingVertical: 16,
+  },
+  successBadge: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
   confirmationTitle: {
-    ...typography.h3,
-    color: colors.textPrimary,
+    fontSize: 20,
+    fontWeight: '700',
     textAlign: 'center',
+    marginBottom: 8,
   },
   confirmationText: {
-    ...typography.body,
-    color: colors.textSecondary,
+    fontSize: 14,
+    lineHeight: 22,
     textAlign: 'center',
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
+    marginBottom: 24,
   },
 });

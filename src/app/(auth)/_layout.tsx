@@ -4,12 +4,11 @@ export default function AuthLayout() {
   return (
     <Stack
       screenOptions={{
-        headerShown: true,
-        headerBackButtonDisplayMode: 'minimal',
+        headerShown: false,
       }}
     >
-      <Stack.Screen name="login" options={{ title: 'Login' }} />
-      <Stack.Screen name="register" options={{ title: 'Create Account' }} />
+      <Stack.Screen name="login" />
+      <Stack.Screen name="register" />
     </Stack>
   );
 }

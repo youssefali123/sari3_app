@@ -21,6 +21,7 @@ import {
 } from '@/features/cart/application/cartSlice';
 import { useAppDispatch, useAppSelector } from '@/shared/lib/store';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
+import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
 import { useColors } from '@/shared/ui/theme';
@@ -28,6 +29,7 @@ import { Button } from '@/shared/ui/components/Button';
 import { EmptyState } from '@/shared/ui/components/EmptyState';
 import { Icon } from '@/shared/ui/components/Icon';
 import { AppScreen, BrandHeader, PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
+import { AuthRequiredView } from '@/shared/ui/components/AuthRequiredModal';
 import { showAlert } from '@/shared/utils/alert';
 import { formatCurrencyCompact } from '@/shared/utils/formatting';
 
@@ -49,6 +51,7 @@ export default function CheckoutScreen() {
   const router = useRouter();
   const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const { theme } = useTheme();
   const colors = useColors();
   const styles = createStyles(theme);
@@ -139,6 +142,20 @@ export default function CheckoutScreen() {
   });
 
   const total = subtotal - couponDiscount + DELIVERY_FEE;
+
+  if (!isAuthLoading && !user) {
+    return (
+      <AppScreen>
+        <BrandHeader title="الدفع" onBack={() => router.back()} />
+        <AuthRequiredView
+          icon="Lock"
+          title="التسجيل مطلوب"
+          message="سجّل دخولك لإتمام عملية الدفع وتأكيد طلبك."
+          returnTo="/(customer)/checkout"
+        />
+      </AppScreen>
+    );
+  }
 
   if (items.length === 0 || !storeId) {
     return (

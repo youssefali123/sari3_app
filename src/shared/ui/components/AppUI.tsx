@@ -201,15 +201,17 @@ export function BrandHeader({
       </View>
 
       {/* End side (Left in RTL) */}
-      {trailing !== undefined ? (
-        trailing
-      ) : onBack ? (
-        <View style={styles.headerSpacer} />
-      ) : (
-        <View style={[styles.brandMark, { backgroundColor: colors.primary }]}>
-          <Icon name="Bike" size={22} color={colors.primaryForeground} />
-        </View>
-      )}
+      <View style={styles.headerTrailing}>
+        {trailing !== undefined ? (
+          trailing
+        ) : onBack ? (
+          <View style={styles.headerSpacer} />
+        ) : (
+          <View style={[styles.brandMark, { backgroundColor: colors.primary }]}>
+            <Icon name="Bike" size={22} color={colors.primaryForeground} />
+          </View>
+        )}
+      </View>
     </View>
   );
 }
@@ -519,9 +521,14 @@ const styles = StyleSheet.create({
     width: 42,
     height: 42,
   },
-  headerCopy: { flex: 1, alignItems: 'flex-end', justifyContent: 'center' },
-  headerSubtitle: { fontSize: 11, marginBottom: 2 },
-  headerTitle: { fontSize: 18, fontWeight: '700' },
+  headerCopy: { flex: 1, minWidth: 0, alignItems: 'flex-end', justifyContent: 'center' },
+  headerSubtitle: { fontSize: 12, marginBottom: 2, textAlign: 'right' },
+  headerTitle: { fontSize: 19, fontWeight: '700', textAlign: 'right' },
+  headerTrailing: {
+    flexShrink: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   brandMark: {
     width: 42,
     height: 42,

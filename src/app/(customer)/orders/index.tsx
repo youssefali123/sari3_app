@@ -7,10 +7,12 @@ import { SupabaseOrderRepository } from '@/features/orders/infrastructure/Supaba
 import { OrderSummaryCard } from '@/features/orders/presentation/OrderSummaryCard';
 import { useReorder } from '@/features/orders/application/hooks/useReorder';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
+import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { ErrorView } from '@/shared/ui/components/ErrorView';
 import { SkeletonOrderCard } from '@/shared/ui/motion';
 import { AppScreen, BrandHeader, EmptyState } from '@/shared/ui/components/AppUI';
+import { AuthRequiredView } from '@/shared/ui/components/AuthRequiredModal';
 import { ConfirmDialog } from '@/shared/ui/components/ConfirmDialog';
 import { showAlert } from '@/shared/utils/alert';
 import { useColors, useTheme } from '@/shared/ui/theme';
@@ -23,6 +25,7 @@ export default function OrderHistoryScreen() {
   useRequireAuth('/(customer)/orders');
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const customerId = useCurrentCustomerId();
   const reorder = useReorder();
   const { theme } = useTheme();
@@ -62,7 +65,21 @@ export default function OrderHistoryScreen() {
     }
   };
 
-  if (isLoading || !customerId) {
+  if (!isAuthLoading && !user) {
+    return (
+      <AppScreen>
+        <BrandHeader title="طلباتي" subtitle="تابع طلباتك بكل سهولة" />
+        <AuthRequiredView
+          icon="ReceiptText"
+          title="التسجيل مطلوب"
+          message="سجّل دخولك لمتابعة حالة طلباتك الحالية واستعراض طلباتك السابقة بسهولة."
+          returnTo="/(customer)/orders"
+        />
+      </AppScreen>
+    );
+  }
+
+  if (isLoading) {
     return (
       <AppScreen>
         <BrandHeader title="طلباتي" subtitle="تابع طلباتك بكل سهولة" />

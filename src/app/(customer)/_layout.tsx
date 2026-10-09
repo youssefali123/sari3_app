@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ColorValue, StyleSheet, View } from 'react-native';
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs, useRouter } from 'expo-router';
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -13,6 +13,7 @@ import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
 import { Icon } from '@/shared/ui/components/Icon';
 import { TabBarButton } from '@/shared/ui/components/TabBarButton';
+import { AuthRequiredModal } from '@/shared/ui/components/AuthRequiredModal';
 
 /**
  * Customer tab layout. Guests browse freely (001 Scenario 1); a signed-in
@@ -25,11 +26,36 @@ import { TabBarButton } from '@/shared/ui/components/TabBarButton';
  * primary pill behind the icon.
  */
 export default function CustomerLayout() {
+  const router = useRouter();
   const { user, profile, isLoading, isProfileLoading } = useAuth();
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = createStyles(theme);
   const activeIconColor = theme.colors.primaryForeground;
+
+  const [authModal, setAuthModal] = useState<{
+    visible: boolean;
+    title: string;
+    message: string;
+    icon: string;
+    returnTo: string;
+  }>({
+    visible: false,
+    title: 'التسجيل مطلوب',
+    message: '',
+    icon: 'Lock',
+    returnTo: '',
+  });
+
+  const promptLogin = (title: string, message: string, icon: string, returnTo: string) => {
+    setAuthModal({
+      visible: true,
+      title,
+      message,
+      icon,
+      returnTo,
+    });
+  };
 
   // Wait for the profile before trusting a null role.
   if (isLoading || (user && isProfileLoading)) {
@@ -41,85 +67,146 @@ export default function CustomerLayout() {
   }
 
   return (
-    <Tabs
-      screenOptions={{
-        headerShown: true,
-        tabBarButton: (props) => <TabBarButton {...props} />,
-        tabBarActiveTintColor: theme.colors.textPrimary,
-        tabBarInactiveTintColor: theme.colors.textMuted,
-        tabBarStyle: {
-          backgroundColor: theme.colors.surface,
-          borderTopColor: theme.colors.divider,
-          borderTopWidth: 1,
-          height: 60 + Math.max(insets.bottom, 8),
-          paddingBottom: Math.max(insets.bottom, 8),
-          paddingTop: 6,
-        },
-        tabBarLabelStyle: {
-          ...theme.typography.caption,
-          fontWeight: '600',
-          fontSize: 11,
-          marginTop: 2,
-        },
-      }}
-    >
-      <Tabs.Screen
-        name="(home)"
-        options={{
-          title: 'الرئيسية',
-          headerShown: false,
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon focused={focused} color={color} name="House" styles={styles} activeColor={activeIconColor} />
-          ),
+    <>
+      <Tabs
+        screenOptions={{
+          headerShown: true,
+          tabBarButton: (props) => <TabBarButton {...props} />,
+          tabBarActiveTintColor: theme.colors.textPrimary,
+          tabBarInactiveTintColor: theme.colors.textMuted,
+          tabBarStyle: {
+            backgroundColor: theme.colors.surface,
+            borderTopColor: theme.colors.divider,
+            borderTopWidth: 1,
+            height: 60 + Math.max(insets.bottom, 8),
+            paddingBottom: Math.max(insets.bottom, 8),
+            paddingTop: 6,
+          },
+          tabBarLabelStyle: {
+            ...theme.typography.caption,
+            fontWeight: '600',
+            fontSize: 11,
+            marginTop: 2,
+          },
+        }}
+      >
+        <Tabs.Screen
+          name="(home)"
+          options={{
+            title: 'الرئيسية',
+            headerShown: false,
+            tabBarIcon: ({ focused, color }) => (
+              <TabIcon focused={focused} color={color} name="House" styles={styles} activeColor={activeIconColor} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="cart"
+          options={{
+            title: 'السلة',
+            headerShown: false,
+            tabBarIcon: ({ focused, color }) => (
+              <TabIcon focused={focused} color={color} name="ShoppingCart" styles={styles} activeColor={activeIconColor} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="orders"
+          listeners={{
+            tabPress: (e) => {
+              if (!user) {
+                e.preventDefault();
+                promptLogin(
+                  'التسجيل مطلوب',
+                  'سجّل دخولك لمتابعة حالة طلباتك الحالية واستعراض طلباتك السابقة بسهولة.',
+                  'ReceiptText',
+                  '/(customer)/orders',
+                );
+              }
+            },
+          }}
+          options={{
+            title: 'طلباتي',
+            headerShown: false,
+            tabBarIcon: ({ focused, color }) => (
+              <TabIcon focused={focused} color={color} name="ReceiptText" styles={styles} activeColor={activeIconColor} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="favorites/index"
+          listeners={{
+            tabPress: (e) => {
+              if (!user) {
+                e.preventDefault();
+                promptLogin(
+                  'التسجيل مطلوب',
+                  'سجّل دخولك للوصول إلى قائمتك المفضلة وحفظ المطاعم والأطباق التي تحبها.',
+                  'Heart',
+                  '/(customer)/favorites',
+                );
+              }
+            },
+          }}
+          options={{
+            title: 'المفضلة',
+            headerShown: false,
+            tabBarIcon: ({ focused, color }) => (
+              <TabIcon focused={focused} color={color} name="Heart" styles={styles} activeColor={activeIconColor} />
+            ),
+          }}
+        />
+        <Tabs.Screen
+          name="profile"
+          listeners={{
+            tabPress: (e) => {
+              if (!user) {
+                e.preventDefault();
+                promptLogin(
+                  'التسجيل مطلوب',
+                  'سجّل دخولك لإدارة حسابك وعناوين التوصيل ومعلوماتك الشخصية.',
+                  'User',
+                  '/(customer)/profile',
+                );
+              }
+            },
+          }}
+          options={{
+            title: 'حسابي',
+            headerShown: false,
+            tabBarIcon: ({ focused, color }) => (
+              <TabIcon focused={focused} color={color} name="User" styles={styles} activeColor={activeIconColor} />
+            ),
+          }}
+        />
+        {/* Non-tab routes: expo-router auto-registers undeclared children as
+            tabs — hide them explicitly (they push as stack screens). */}
+        <Tabs.Screen name="checkout/index" options={{ href: null, headerShown: false }} />
+        <Tabs.Screen name="addresses/index" options={{ href: null, headerShown: false }} />
+        <Tabs.Screen name="favorites/stores" options={{ href: null, headerShown: false }} />
+        <Tabs.Screen name="favorites/products" options={{ href: null, headerShown: false }} />
+      </Tabs>
+
+      <AuthRequiredModal
+        visible={authModal.visible}
+        title={authModal.title}
+        message={authModal.message}
+        icon={authModal.icon}
+        confirmLabel="تسجيل الدخول"
+        cancelLabel="تصفح كزائر"
+        onConfirm={() => {
+          const returnTo = authModal.returnTo;
+          setAuthModal((prev) => ({ ...prev, visible: false }));
+          router.push({
+            pathname: '/(auth)/login',
+            params: { returnTo },
+          });
+        }}
+        onCancel={() => {
+          setAuthModal((prev) => ({ ...prev, visible: false }));
         }}
       />
-      <Tabs.Screen
-        name="cart"
-        options={{
-          title: 'السلة',
-          headerShown: false,
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon focused={focused} color={color} name="ShoppingCart" styles={styles} activeColor={activeIconColor} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="orders"
-        options={{
-          title: 'طلباتي',
-          headerShown: false,
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon focused={focused} color={color} name="ReceiptText" styles={styles} activeColor={activeIconColor} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="favorites/index"
-        options={{
-          title: 'المفضلة',
-          headerShown: false,
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon focused={focused} color={color} name="Heart" styles={styles} activeColor={activeIconColor} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          title: 'حسابي',
-          headerShown: false,
-          tabBarIcon: ({ focused, color }) => (
-            <TabIcon focused={focused} color={color} name="User" styles={styles} activeColor={activeIconColor} />
-          ),
-        }}
-      />
-      {/* Non-tab routes: expo-router auto-registers undeclared children as
-          tabs — hide them explicitly (they push as stack screens). */}
-      <Tabs.Screen name="checkout/index" options={{ href: null, headerShown: false }} />
-      <Tabs.Screen name="addresses/index" options={{ href: null, headerShown: false }} />
-      <Tabs.Screen name="favorites/stores" options={{ href: null, headerShown: false }} />
-      <Tabs.Screen name="favorites/products" options={{ href: null, headerShown: false }} />
-    </Tabs>
+    </>
   );
 }
 

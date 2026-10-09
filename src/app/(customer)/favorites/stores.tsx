@@ -15,7 +15,9 @@ import {
   ErrorState,
   LoadingState,
   PrimaryButton,
+  AuthRequiredView,
 } from '@/shared/ui/components';
+import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { SkeletonCard } from '@/shared/ui/motion';
 
 const favoritesRepository: FavoritesRepository = new SupabaseFavoritesRepository();
@@ -23,6 +25,7 @@ const favoritesRepository: FavoritesRepository = new SupabaseFavoritesRepository
 export default function FavoriteStoresScreen() {
   useRequireAuth('/(customer)/favorites/stores');
   const router = useRouter();
+  const { user, isLoading: isAuthLoading } = useAuth();
   const customerId = useCurrentCustomerId();
   const { selectedAreaId, selectedAreaName } = useSelectedArea();
 
@@ -44,6 +47,24 @@ export default function FavoriteStoresScreen() {
     return stores.filter((s) => s.areaId === selectedAreaId);
   }, [stores, selectedAreaId]);
 
+  if (!isAuthLoading && !user) {
+    return (
+      <AppScreen>
+        <BrandHeader
+          title="المتاجر المفضلة"
+          subtitle="متاجرك المحفوظة للطلب السريع"
+          onBack={() => router.back()}
+        />
+        <AuthRequiredView
+          icon="Heart"
+          title="التسجيل مطلوب"
+          message="سجّل دخولك للوصول إلى متاجرك المفضلة."
+          returnTo="/(customer)/favorites/stores"
+        />
+      </AppScreen>
+    );
+  }
+
   return (
     <AppScreen>
       <BrandHeader
@@ -52,7 +73,7 @@ export default function FavoriteStoresScreen() {
         onBack={() => router.back()}
       />
 
-      {isLoading || !customerId ? (
+      {isLoading ? (
         <View style={styles.listContent}>
           {[0, 1, 2].map((idx) => (
             <SkeletonCard key={idx} style={{ height: 110, borderRadius: 20 }} />

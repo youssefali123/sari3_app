@@ -54,6 +54,7 @@ export function AddressSelectionModal({
   const [formError, setFormError] = useState<string | null>(null);
 
   async function handleAddNew() {
+    Keyboard.dismiss();
     if (!label.trim()) {
       setFormError('يرجى إدخال تسمية للعنوان (مثال: المنزل).');
       return;
@@ -69,7 +70,7 @@ export function AddressSelectionModal({
       setLabel('');
       setAddressText('');
       setShowForm(false);
-      Keyboard.dismiss();
+      onClose();
     } catch (error) {
       setFormError(error instanceof Error ? error.message : 'تعذر حفظ العنوان.');
     } finally {
@@ -132,7 +133,7 @@ export function AddressSelectionModal({
           {showForm ? (
             <ScrollView
               showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
+              keyboardShouldPersistTaps="always"
               contentContainerStyle={styles.formContainer}
             >
               <Input

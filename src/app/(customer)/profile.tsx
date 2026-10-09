@@ -6,6 +6,7 @@ import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAut
 import { useColors } from '@/shared/ui/hooks/useColors';
 import {
   AppScreen,
+  AuthRequiredView,
   BrandHeader,
   PageScroll,
   PrimaryButton,
@@ -18,8 +19,22 @@ export default function CustomerProfileScreen() {
   const router = useRouter();
   // Protected screen: guests are redirected to login with returnTo (FR-003).
   useRequireAuth('/(customer)/profile');
-  const { profile, signOut } = useAuth();
+  const { user, profile, signOut, isLoading: isAuthLoading } = useAuth();
   const colors = useColors();
+
+  if (!isAuthLoading && !user) {
+    return (
+      <AppScreen>
+        <BrandHeader title="حسابي" subtitle="إدارة ملفك الشخصي" />
+        <AuthRequiredView
+          icon="User"
+          title="التسجيل مطلوب"
+          message="سجّل دخولك لإدارة حسابك وعناوين التوصيل والاطلاع على تفاصيلك."
+          returnTo="/(customer)/profile"
+        />
+      </AppScreen>
+    );
+  }
 
   const isDriver = profile?.role === 'driver';
 
