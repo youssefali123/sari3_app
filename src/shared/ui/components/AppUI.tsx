@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useColors } from '../hooks/useColors';
 import { useTheme } from '../context/ThemeContext';
 import { Icon } from './Icon';
+import { AppLogo } from './AppLogo';
 
 // Helper to map common icon keys to Lucide icon names
 function mapIconName(name: string): string {
@@ -207,9 +208,7 @@ export function BrandHeader({
         ) : onBack ? (
           <View style={styles.headerSpacer} />
         ) : (
-          <View style={[styles.brandMark, { backgroundColor: colors.primary }]}>
-            <Icon name="Bike" size={22} color={colors.primaryForeground} />
-          </View>
+          <AppLogo size={40} />
         )}
       </View>
     </View>

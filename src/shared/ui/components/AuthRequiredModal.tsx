@@ -10,6 +10,7 @@ import {
 import Animated from 'react-native-reanimated';
 import { useRouter } from 'expo-router';
 import { Icon } from './Icon';
+import { AppLogo } from './AppLogo';
 import { useColors, useTheme } from '@/shared/ui/theme';
 import { fireHaptic, useModalMotion, useReducedMotion } from '@/shared/ui/motion';
 
@@ -248,17 +249,7 @@ export function AuthRequiredView({
           },
         ]}
       >
-        <View
-          style={[
-            viewStyles.iconWrap,
-            {
-              backgroundColor: colors.primarySubtle,
-              borderColor: 'rgba(245, 189, 22, 0.35)',
-            },
-          ]}
-        >
-          <Icon name={icon} size={38} color={colors.primaryPressed} />
-        </View>
+        <AppLogo size={74} withShadow style={viewStyles.logo} />
 
         <Text
           style={[
@@ -455,14 +446,8 @@ const viewStyles = StyleSheet.create({
     padding: 28,
     alignItems: 'center',
   },
-  iconWrap: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    borderWidth: 1.5,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 18,
+  logo: {
+    marginBottom: 16,
   },
   title: {
     fontSize: 20,

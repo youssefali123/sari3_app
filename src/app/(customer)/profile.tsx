@@ -5,6 +5,7 @@ import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { useColors } from '@/shared/ui/hooks/useColors';
 import {
+  AppLogo,
   AppScreen,
   AuthRequiredView,
   BrandHeader,
@@ -165,9 +166,12 @@ export default function CustomerProfileScreen() {
           />
         </Surface>
 
-        <Text style={[styles.versionText, { color: colors.mutedForeground }]}>
-          سريع · تطبيق التوصيل الأسرع في مدينتك · الإصدار 1.0.0
-        </Text>
+        <View style={styles.brandFooter}>
+          <AppLogo size={52} withShadow style={styles.footerLogo} />
+          <Text style={[styles.versionText, { color: colors.mutedForeground }]}>
+            سريع · تطبيق التوصيل الأسرع في مدينتك · الإصدار 1.0.0
+          </Text>
+        </View>
       </PageScroll>
     </AppScreen>
   );
@@ -245,11 +249,20 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 22,
   },
+  brandFooter: {
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  footerLogo: {
+    marginBottom: 2,
+  },
   versionText: {
     fontSize: 11,
     lineHeight: 18,
     textAlign: 'center',
     paddingHorizontal: 12,
-    marginTop: 4,
+    marginTop: 2,
   },
 });

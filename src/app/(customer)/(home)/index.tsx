@@ -35,6 +35,7 @@ import { Icon } from '@/shared/ui/components/Icon';
 import { Button } from '@/shared/ui/components/Button';
 import { EmptyState } from '@/shared/ui/components/EmptyState';
 import { ErrorState } from '@/shared/ui/components/ErrorState';
+import { AppLogo } from '@/shared/ui/components/AppLogo';
 import { SectionTitle, Surface } from '@/shared/ui/components/AppUI';
 import {
   SkeletonCard,
@@ -157,8 +158,9 @@ export default function HomeScreen() {
         </View>
       </Pressable>
 
-      {/* Left side (RTL End): Notification bell and quick actions */}
+      {/* Left side (RTL End): Notification bell and app logo brand */}
       <View style={styles.headerLeftActions}>
+        <AppLogo size={38} />
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="الإشعارات"

@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { LoginForm } from '@/features/auth/presentation/components/LoginForm';
 import { ProfileErrorView } from '@/features/auth/presentation/components/ProfileErrorView';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
-import { AppScreen, BrandHeader } from '@/shared/ui/components/AppUI';
+import { AppLogo, AppScreen, BrandHeader } from '@/shared/ui/components';
 import { Icon } from '@/shared/ui/components/Icon';
 import { useColors, useTheme } from '@/shared/ui/theme';
 import { useSmoothKeyboardElevation } from '@/shared/ui/motion';
@@ -101,19 +101,7 @@ export default function LoginScreen() {
           <Animated.View style={animatedKeyboardStyle}>
             {/* Brand Banner */}
         <View style={styles.brandHero}>
-          <View
-            style={[
-              styles.logoHalo,
-              {
-                backgroundColor: colors.primarySubtle,
-                borderColor: 'rgba(245, 189, 22, 0.45)',
-              },
-            ]}
-          >
-            <View style={[styles.logoCore, { backgroundColor: colors.primary }]}>
-              <Icon name="Bike" size={26} color={colors.primaryForeground} />
-            </View>
-          </View>
+          <AppLogo size={82} withShadow style={styles.brandLogo} />
 
           <View style={styles.brandTitleRow}>
             <Text
@@ -253,21 +241,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  logoHalo: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 10,
-  },
-  logoCore: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
+  brandLogo: {
+    marginBottom: 12,
   },
   brandTitleRow: {
     flexDirection: 'row-reverse',

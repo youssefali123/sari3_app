@@ -7,6 +7,7 @@ import { useDriverAreas } from '@/features/drivers/application/hooks/useDriverAr
 import { AvailabilityToggle } from '@/features/drivers/presentation/components/AvailabilityToggle';
 import { useColors } from '@/shared/ui/hooks/useColors';
 import {
+  AppLogo,
   AppScreen,
   BrandHeader,
   PageScroll,
@@ -129,9 +130,12 @@ export default function DriverProfileScreen() {
           />
         </Surface>
 
-        <Text style={[styles.versionText, { color: colors.mutedForeground }]}>
-          سريع · تطبيق كباتن التوصيل · الإصدار 1.0.0
-        </Text>
+        <View style={styles.brandFooter}>
+          <AppLogo size={52} withShadow style={styles.footerLogo} />
+          <Text style={[styles.versionText, { color: colors.mutedForeground }]}>
+            سريع · تطبيق كباتن التوصيل · الإصدار 1.0.0
+          </Text>
+        </View>
       </PageScroll>
     </AppScreen>
   );
@@ -223,11 +227,20 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 22,
   },
+  brandFooter: {
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 14,
+    marginBottom: 8,
+  },
+  footerLogo: {
+    marginBottom: 2,
+  },
   versionText: {
     fontSize: 11,
     lineHeight: 18,
     textAlign: 'center',
     paddingHorizontal: 12,
-    marginTop: 4,
+    marginTop: 2,
   },
 });
