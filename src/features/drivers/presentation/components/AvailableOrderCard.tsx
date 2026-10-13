@@ -6,7 +6,7 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useColors } from '@/shared/ui/hooks/useColors';
+import { useColors, useTheme } from '@/shared/ui/theme';
 import { Icon } from '@/shared/ui/components/Icon';
 import { Surface } from '@/shared/ui/components/AppUI';
 import { formatDateTime } from '@/shared/utils/formatting';
@@ -25,7 +25,7 @@ interface AvailableOrderCardProps {
 
 /**
  * Pre-acceptance projection of an unclaimed order.
- * Upgraded to SOURCE DriverOrderCard design language:
+ * Upgraded to Sari3 DriverOrderCard design language:
  * 20px radius Surface card, RTL layout, Lucide icons, quick accept & decline actions.
  * Never reveals customer address or phone before claim (FR-004 preserved).
  */
@@ -38,6 +38,7 @@ export function AvailableOrderCard({
   isDeclining,
 }: AvailableOrderCardProps) {
   const colors = useColors();
+  const { theme } = useTheme();
 
   return (
     <Pressable
@@ -48,23 +49,49 @@ export function AvailableOrderCard({
     >
       <Surface style={styles.card}>
         <View style={styles.headerRow}>
-          <View style={[styles.storeIconBox, { backgroundColor: colors.muted }]}>
-            <Icon name="ShoppingBag" size={22} color={colors.foreground} />
+          <View style={[styles.storeIconBox, { backgroundColor: colors.primarySubtle }]}>
+            <Icon name="ShoppingBag" size={22} color={colors.primaryPressed} />
           </View>
           <View style={styles.headerCopy}>
-            <Text style={[styles.storeName, { color: colors.foreground }]}>
+            <Text
+              style={[
+                styles.storeName,
+                {
+                  color: colors.foreground,
+                  fontFamily: theme.typography.headingSmall.fontFamily,
+                },
+              ]}
+            >
               {order.storeName}
             </Text>
-            <Text style={[styles.metaText, { color: colors.mutedForeground }]}>
+            <Text
+              style={[
+                styles.metaText,
+                {
+                  color: colors.mutedForeground,
+                  fontFamily: theme.typography.caption.fontFamily,
+                },
+              ]}
+            >
               {order.itemCount} {order.itemCount === 1 ? 'منتج' : 'منتجات'} · {formatDateTime(order.createdAt)}
             </Text>
           </View>
         </View>
 
         {order.storeNeighbourhood ? (
-          <View style={styles.detailLine}>
-            <Icon name="MapPin" size={16} color={colors.secondaryForeground} />
-            <Text style={[styles.detailText, { color: colors.foreground }]}>
+          <View style={[styles.detailLine, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <View style={[styles.detailPinBadge, { backgroundColor: colors.primarySubtle }]}>
+              <Icon name="MapPin" size={14} color={colors.primaryPressed} />
+            </View>
+            <Text
+              style={[
+                styles.detailText,
+                {
+                  color: colors.foreground,
+                  fontFamily: theme.typography.bodySmall.fontFamily,
+                },
+              ]}
+            >
               منطقة الاستلام: {order.storeNeighbourhood}
             </Text>
           </View>
@@ -84,7 +111,15 @@ export function AvailableOrderCard({
               {isDeclining ? (
                 <ActivityIndicator size="small" color={colors.destructive} />
               ) : (
-                <Text style={[styles.declineText, { color: colors.mutedForeground }]}>
+                <Text
+                  style={[
+                    styles.declineText,
+                    {
+                      color: colors.mutedForeground,
+                      fontFamily: theme.typography.button.fontFamily,
+                    },
+                  ]}
+                >
                   تجاهل
                 </Text>
               )}
@@ -100,17 +135,24 @@ export function AvailableOrderCard({
                 styles.claimButton,
                 {
                   backgroundColor: colors.primary,
-                  borderColor: colors.border,
-                  opacity: pressed || isClaiming ? 0.7 : 1,
+                  opacity: pressed || isClaiming ? 0.75 : 1,
                 },
               ]}
             >
               {isClaiming ? (
-                <ActivityIndicator size="small" color={colors.foreground} />
+                <ActivityIndicator size="small" color="#1A1D20" />
               ) : (
                 <View style={styles.claimButtonInner}>
-                  <Icon name="CheckCircle2" size={17} color={colors.foreground} />
-                  <Text style={[styles.claimText, { color: colors.foreground }]}>
+                  <Icon name="CheckCircle2" size={17} color="#1A1D20" strokeWidth={2.5} />
+                  <Text
+                    style={[
+                      styles.claimText,
+                      {
+                        color: '#1A1D20',
+                        fontFamily: theme.typography.button.fontFamily,
+                      },
+                    ]}
+                  >
                     قبول الطلب
                   </Text>
                 </View>
@@ -158,41 +200,31 @@ const styles = StyleSheet.create({
   detailLine: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
     gap: 8,
-    paddingVertical: 2,
+  },
+  detailPinBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   detailText: {
     fontSize: 13,
-    flex: 1,
     textAlign: 'right',
   },
   actionsRow: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
+    flexDirection: 'row',
     gap: 10,
     marginTop: 4,
   },
-  claimButton: {
+  declineButton: {
     flex: 1,
     minHeight: 44,
-    borderRadius: 14,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 16,
-  },
-  claimButtonInner: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 7,
-  },
-  claimText: {
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  declineButton: {
-    minHeight: 44,
-    paddingHorizontal: 16,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
@@ -201,5 +233,21 @@ const styles = StyleSheet.create({
   declineText: {
     fontSize: 13,
     fontWeight: '600',
+  },
+  claimButton: {
+    flex: 2,
+    minHeight: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  claimButtonInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  claimText: {
+    fontSize: 14,
+    fontWeight: '700',
   },
 });

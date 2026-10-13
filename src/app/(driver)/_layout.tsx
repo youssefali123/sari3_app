@@ -47,7 +47,7 @@ export default function DriverLayout() {
 
   const { theme } = useTheme();
   const styles = createStyles(theme);
-  const activeIconColor = theme.colors.primaryForeground;
+  const activeIconColor = '#1A1D20';
 
   return (
     <View style={{ flex: 1, backgroundColor: theme.colors.background }}>
@@ -56,7 +56,7 @@ export default function DriverLayout() {
         screenOptions={{
           headerShown: false,
           tabBarButton: (props) => <TabBarButton {...props} />,
-          tabBarActiveTintColor: theme.colors.textPrimary,
+          tabBarActiveTintColor: theme.colors.foreground,
           tabBarInactiveTintColor: theme.colors.textMuted,
           tabBarStyle: {
             backgroundColor: theme.colors.surface,
@@ -67,8 +67,8 @@ export default function DriverLayout() {
             paddingTop: 6,
           },
           tabBarLabelStyle: {
-            ...theme.typography.caption,
-            fontWeight: '600',
+            fontFamily: theme.typography.caption.fontFamily,
+            fontWeight: '700',
             fontSize: 11,
             marginTop: 2,
           },

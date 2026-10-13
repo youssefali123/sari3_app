@@ -96,7 +96,7 @@ export default function AvailableOrdersScreen() {
       ) : !hasAssignedAreas ? (
         <View style={styles.centerContainer}>
           <EmptyState
-            emoji="📍"
+            icon="MapPin"
             title="لم يتم تعيين مناطق توصيل"
             message="يرجى التواصل مع الإدارة أو الدعم الفني لتفعيل نطاقات التوصيل الخاصة بك."
           />
@@ -104,7 +104,7 @@ export default function AvailableOrdersScreen() {
       ) : !isAvailable ? (
         <View style={styles.centerContainer}>
           <EmptyState
-            emoji="🛵"
+            icon="Bike"
             title="أنت غير متصل حالياً"
             message="قم بتفعيل وضع الاتصال في الأعلى لاستقبال وتصفح طلبات التوصيل المتاحة."
           />
@@ -112,7 +112,7 @@ export default function AvailableOrdersScreen() {
       ) : activeOrder ? (
         <View style={styles.centerContainer}>
           <EmptyState
-            emoji="📦"
+            icon="Bike"
             title="لديك توصيلة نشطة حالياً"
             message="أكمل الطلب النشط في تبويب 'طلباتي النشطة' لتتمكن من استقبال طلبات جديدة."
             action={
@@ -129,7 +129,7 @@ export default function AvailableOrdersScreen() {
       ) : orders.length === 0 ? (
         <View style={styles.centerContainer}>
           <EmptyState
-            emoji="🛵"
+            icon="ShoppingBag"
             title="لا توجد طلبات متاحة الآن"
             message="ستظهر الطلبات الجديدة هنا فور قيام العملاء بالطلب في منطقتك."
           />

@@ -39,7 +39,7 @@ export default function DriverHistoryScreen() {
       ) : entries.length === 0 ? (
         <View style={styles.centerContainer}>
           <EmptyState
-            emoji="📜"
+            icon="receipt-outline"
             title="لا توجد طلبات سابقة"
             message="ستجد هنا سجل توصيلاتك والرحلات التي قمت بها فور إتمام أول طلب."
           />

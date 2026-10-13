@@ -62,7 +62,7 @@ export default function DriverDeliveryDetailScreen() {
         <BrandHeader title="تفاصيل الرحلة" onBack={() => router.back()} />
         <View style={styles.centerContainer}>
           <EmptyState
-            emoji="⚠️"
+            icon="close-circle-outline"
             title="الطلب غير موجود"
             message="لم يتم العثور على بيانات هذه الرحلة في السجل."
           />

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useColors } from '@/shared/ui/hooks/useColors';
+import { useColors, useTheme } from '@/shared/ui/theme';
 import { Icon } from '@/shared/ui/components/Icon';
 import { Surface } from '@/shared/ui/components/AppUI';
 import { formatDateTime } from '@/shared/utils/formatting';
@@ -23,13 +23,31 @@ interface DeliveryHistoryCardProps {
 
 /**
  * One delivery-history row.
- * Upgraded to SOURCE design language with Surface card, RTL layout, and Arabic statuses.
+ * Upgraded to Sari3 design language with Surface card, RTL layout, color-coded status badges, and Tajawal typography.
  */
 export function DeliveryHistoryCard({ entry, onOpen }: DeliveryHistoryCardProps) {
   const colors = useColors();
+  const { theme } = useTheme();
 
   const isCompleted = entry.finalStatus === 'completed';
   const isCancelled = entry.finalStatus === 'cancelled';
+  const isReleased = entry.finalStatus === 'released';
+
+  const badgeBg = isCompleted
+    ? '#27AE6018'
+    : isCancelled
+    ? colors.destructive + '15'
+    : isReleased
+    ? '#F39C1218'
+    : colors.muted;
+
+  const badgeColor = isCompleted
+    ? '#27AE60'
+    : isCancelled
+    ? colors.destructive
+    : isReleased
+    ? '#D68910'
+    : colors.mutedForeground;
 
   return (
     <Pressable
@@ -40,23 +58,28 @@ export function DeliveryHistoryCard({ entry, onOpen }: DeliveryHistoryCardProps)
     >
       <Surface style={styles.card}>
         <View style={styles.headerRow}>
-          <View style={[styles.storeIcon, { backgroundColor: colors.muted }]}>
-            <Icon name="ShoppingBag" size={20} color={colors.foreground} />
+          <View style={[styles.storeIcon, { backgroundColor: colors.primarySubtle }]}>
+            <Icon name="ShoppingBag" size={20} color={colors.primaryPressed} />
           </View>
           <View style={styles.headerCopy}>
             <View style={styles.titleRow}>
-              <Text style={[styles.storeName, { color: colors.foreground }]} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.storeName,
+                  {
+                    color: colors.foreground,
+                    fontFamily: theme.typography.headingSmall.fontFamily,
+                  },
+                ]}
+                numberOfLines={1}
+              >
                 {entry.storeName}
               </Text>
               <View
                 style={[
                   styles.badge,
                   {
-                    backgroundColor: isCompleted
-                      ? colors.secondary
-                      : isCancelled
-                      ? colors.destructive + '15'
-                      : colors.muted,
+                    backgroundColor: badgeBg,
                   },
                 ]}
               >
@@ -64,11 +87,8 @@ export function DeliveryHistoryCard({ entry, onOpen }: DeliveryHistoryCardProps)
                   style={[
                     styles.badgeText,
                     {
-                      color: isCompleted
-                        ? colors.secondaryForeground
-                        : isCancelled
-                        ? colors.destructive
-                        : colors.foreground,
+                      color: badgeColor,
+                      fontFamily: theme.typography.caption.fontFamily,
                     },
                   ]}
                 >
@@ -76,7 +96,15 @@ export function DeliveryHistoryCard({ entry, onOpen }: DeliveryHistoryCardProps)
                 </Text>
               </View>
             </View>
-            <Text style={[styles.dateText, { color: colors.mutedForeground }]}>
+            <Text
+              style={[
+                styles.dateText,
+                {
+                  color: colors.mutedForeground,
+                  fontFamily: theme.typography.caption.fontFamily,
+                },
+              ]}
+            >
               {formatDateTime(entry.orderDate)}
             </Text>
           </View>
@@ -84,8 +112,17 @@ export function DeliveryHistoryCard({ entry, onOpen }: DeliveryHistoryCardProps)
         </View>
 
         {entry.finalStatus === 'released' && entry.releaseReason ? (
-          <View style={[styles.reasonBox, { backgroundColor: colors.muted }]}>
-            <Text style={[styles.releaseReason, { color: colors.mutedForeground }]} numberOfLines={2}>
+          <View style={[styles.reasonBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
+            <Text
+              style={[
+                styles.releaseReason,
+                {
+                  color: colors.mutedForeground,
+                  fontFamily: theme.typography.caption.fontFamily,
+                },
+              ]}
+              numberOfLines={2}
+            >
               سبب الاعتذار: {entry.releaseReason}
             </Text>
           </View>
@@ -145,6 +182,7 @@ const styles = StyleSheet.create({
   reasonBox: {
     padding: 10,
     borderRadius: 12,
+    borderWidth: 1,
   },
   releaseReason: {
     fontSize: 12,

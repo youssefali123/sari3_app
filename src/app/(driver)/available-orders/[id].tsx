@@ -63,7 +63,7 @@ export default function AvailableOrderDetailScreen() {
         <BrandHeader title="تفاصيل الطلب" onBack={() => router.back()} />
         <View style={styles.centerContainer}>
           <EmptyState
-            emoji="⚠️"
+            icon="close-circle-outline"
             title="الطلب غير متاح"
             message={NOT_AVAILABLE_MESSAGE}
             action={

@@ -4,14 +4,14 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useDriverAvailability } from '@/features/drivers/application/hooks/useDriverAvailability';
 import { useDriverAreas } from '@/features/drivers/application/hooks/useDriverAreas';
+import { useDriverHistory } from '@/features/drivers/application/hooks/useDriverHistory';
 import { AvailabilityToggle } from '@/features/drivers/presentation/components/AvailabilityToggle';
-import { useColors } from '@/shared/ui/hooks/useColors';
+import { useColors, useTheme } from '@/shared/ui/theme';
 import {
   AppLogo,
   AppScreen,
   BrandHeader,
   PageScroll,
-  PrimaryButton,
   ProfileRow,
   Surface,
 } from '@/shared/ui/components';
@@ -19,16 +19,25 @@ import { Icon } from '@/shared/ui/components/Icon';
 
 /**
  * Driver profile:
- * Upgraded to SOURCE design language with BrandHeader, Hero Banner,
- * Surface cards, and clean Arabic copy.
+ * Upgraded to Sari3 design language with Hero Banner, Stats Grid,
+ * Surface cards, Tajawal typography, and clean Arabic copy.
  */
 export default function DriverProfileScreen() {
   const router = useRouter();
   const colors = useColors();
+  const { theme } = useTheme();
   const { profile, signOut } = useAuth();
   const { isAvailable } = useDriverAvailability();
   const { areaNames, hasAssignedAreas, isLoading: areasLoading } = useDriverAreas();
-  const workAreaLabel = hasAssignedAreas ? areaNames.join('، ') : 'لم يتم تعيين نطاقات توصيل بعد';
+  const { data: historyData } = useDriverHistory();
+
+  const completedDeliveries = (historyData ?? []).filter(
+    (e) => e.finalStatus === 'completed',
+  ).length;
+
+  const workAreaLabel = hasAssignedAreas
+    ? areaNames.join('، ')
+    : 'لم يتم تعيين نطاقات توصيل بعد';
 
   async function handleSignOut() {
     Alert.alert(
@@ -41,7 +50,6 @@ export default function DriverProfileScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              // Centralized signOut: also purges the TanStack Query cache.
               await signOut();
               router.replace('/(customer)/(home)');
             } catch (error) {
@@ -63,21 +71,156 @@ export default function DriverProfileScreen() {
         {/* Driver Hero Banner */}
         <View style={[styles.profileHero, { backgroundColor: colors.primary }]}>
           <View style={styles.profileAvatar}>
-            <Icon name="Bike" size={36} color={colors.foreground} />
+            <Icon name="Bike" size={38} color="#1A1D20" />
           </View>
-          <Text style={[styles.profileName, { color: colors.foreground }]}>
+          <Text
+            style={[
+              styles.profileName,
+              {
+                color: '#1A1D20',
+                fontFamily: theme.typography.headingMedium.fontFamily,
+              },
+            ]}
+          >
             {profile?.fullName || 'كابتن سريع'}
           </Text>
-          <View style={[styles.statusBadge, { backgroundColor: isAvailable ? colors.secondary : 'rgba(255,255,255,0.4)' }]}>
-            <Text style={[styles.statusBadgeText, { color: isAvailable ? colors.secondaryForeground : colors.foreground }]}>
+          <View
+            style={[
+              styles.statusBadge,
+              {
+                backgroundColor: isAvailable ? '#1A1D20' : 'rgba(26, 29, 32, 0.15)',
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.statusBadgeText,
+                {
+                  color: isAvailable ? '#FFFFFF' : '#1A1D20',
+                  fontFamily: theme.typography.caption.fontFamily,
+                },
+              ]}
+            >
               {isAvailable ? 'متصل ومستعد للتوصيل' : 'غير متصل حالياً'}
             </Text>
           </View>
         </View>
 
-        {/* Availability Section */}
+        {/* Quick Stats Grid */}
+        <View style={styles.statsGrid}>
+          {/* Stat 1: Completed Deliveries */}
+          <Surface style={styles.statCard}>
+            <View style={[styles.statIconBadge, { backgroundColor: colors.primarySubtle }]}>
+              <Icon name="CheckCircle2" size={18} color={colors.primaryPressed} />
+            </View>
+            <Text
+              style={[
+                styles.statValue,
+                {
+                  color: colors.foreground,
+                  fontFamily: theme.typography.headingSmall.fontFamily,
+                },
+              ]}
+            >
+              {completedDeliveries}
+            </Text>
+            <Text
+              style={[
+                styles.statLabel,
+                {
+                  color: colors.mutedForeground,
+                  fontFamily: theme.typography.caption.fontFamily,
+                },
+              ]}
+            >
+              رحلة مكتملة
+            </Text>
+          </Surface>
+
+          {/* Stat 2: Active Areas */}
+          <Surface style={styles.statCard}>
+            <View style={[styles.statIconBadge, { backgroundColor: colors.primarySubtle }]}>
+              <Icon name="MapPin" size={18} color={colors.primaryPressed} />
+            </View>
+            <Text
+              style={[
+                styles.statValue,
+                {
+                  color: colors.foreground,
+                  fontFamily: theme.typography.headingSmall.fontFamily,
+                },
+              ]}
+            >
+              {areaNames.length}
+            </Text>
+            <Text
+              style={[
+                styles.statLabel,
+                {
+                  color: colors.mutedForeground,
+                  fontFamily: theme.typography.caption.fontFamily,
+                },
+              ]}
+            >
+              نطاقات مصرحة
+            </Text>
+          </Surface>
+
+          {/* Stat 3: Status */}
+          <Surface style={styles.statCard}>
+            <View
+              style={[
+                styles.statIconBadge,
+                {
+                  backgroundColor: isAvailable
+                    ? colors.primarySubtle
+                    : colors.muted,
+                },
+              ]}
+            >
+              <Icon
+                name={isAvailable ? 'Zap' : 'Moon'}
+                size={18}
+                color={isAvailable ? colors.primaryPressed : colors.mutedForeground}
+              />
+            </View>
+            <Text
+              style={[
+                styles.statValue,
+                {
+                  color: colors.foreground,
+                  fontFamily: theme.typography.headingSmall.fontFamily,
+                  fontSize: 14,
+                },
+              ]}
+            >
+              {isAvailable ? 'متصل' : 'مغلق'}
+            </Text>
+            <Text
+              style={[
+                styles.statLabel,
+                {
+                  color: colors.mutedForeground,
+                  fontFamily: theme.typography.caption.fontFamily,
+                },
+              ]}
+            >
+              حالة الكابتن
+            </Text>
+          </Surface>
+        </View>
+
+        {/* Availability Toggle Section */}
         <Surface style={styles.sectionCard}>
-          <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+          <Text
+            style={[
+              styles.sectionTitle,
+              {
+                color: colors.foreground,
+                fontFamily: theme.typography.headingSmall.fontFamily,
+              },
+            ]}
+          >
             حالة استقبال الطلبات
           </Text>
           <AvailabilityToggle />
@@ -86,36 +229,32 @@ export default function DriverProfileScreen() {
         {/* Work Areas Section */}
         <Surface style={styles.sectionCard}>
           <View style={styles.areaHeader}>
-            <Icon name="MapPin" size={18} color={colors.secondaryForeground} />
-            <Text style={[styles.sectionTitle, { color: colors.foreground }]}>
+            <View style={[styles.areaIconWrap, { backgroundColor: colors.primarySubtle }]}>
+              <Icon name="MapPin" size={16} color={colors.primaryPressed} />
+            </View>
+            <Text
+              style={[
+                styles.sectionTitle,
+                {
+                  color: colors.foreground,
+                  fontFamily: theme.typography.headingSmall.fontFamily,
+                },
+              ]}
+            >
               نطاقات التوصيل المصرح بها
             </Text>
           </View>
-          <Text style={[styles.areaText, { color: colors.mutedForeground }]}>
+          <Text
+            style={[
+              styles.areaText,
+              {
+                color: colors.mutedForeground,
+                fontFamily: theme.typography.bodyMedium.fontFamily,
+              },
+            ]}
+          >
             {areasLoading ? 'جاري تحميل مناطق العمل…' : workAreaLabel}
           </Text>
-        </Surface>
-
-        {/* Switch to customer view */}
-        <Surface style={[styles.switchCard, { backgroundColor: colors.muted }]}>
-          <View style={styles.switchHeader}>
-            <View style={[styles.switchIcon, { backgroundColor: colors.card }]}>
-              <Icon name="User" size={20} color={colors.foreground} />
-            </View>
-            <View style={styles.switchCopy}>
-              <Text style={[styles.switchTitle, { color: colors.foreground }]}>
-                تصفح كعميل
-              </Text>
-              <Text style={[styles.switchSubtitle, { color: colors.mutedForeground }]}>
-                الانتقال إلى واجهة متجر وتجربة طلب الوجبات
-              </Text>
-            </View>
-          </View>
-          <PrimaryButton
-            title="الانتقال إلى وضع العميل"
-            icon="basket"
-            onPress={() => router.replace('/(customer)/(home)' as never)}
-          />
         </Surface>
 
         {/* Sign Out Section */}
@@ -132,7 +271,15 @@ export default function DriverProfileScreen() {
 
         <View style={styles.brandFooter}>
           <AppLogo size={52} withShadow style={styles.footerLogo} />
-          <Text style={[styles.versionText, { color: colors.mutedForeground }]}>
+          <Text
+            style={[
+              styles.versionText,
+              {
+                color: colors.mutedForeground,
+                fontFamily: theme.typography.caption.fontFamily,
+              },
+            ]}
+          >
             سريع · تطبيق كباتن التوصيل · الإصدار 1.0.0
           </Text>
         </View>
@@ -155,7 +302,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: 'rgba(255,255,255,0.75)',
   },
   profileName: {
     fontSize: 20,
@@ -171,76 +318,79 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
   },
+  statsGrid: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  statCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: 18,
+    gap: 4,
+  },
+  statIconBadge: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  statLabel: {
+    fontSize: 11,
+    textAlign: 'center',
+  },
   sectionCard: {
     padding: 16,
     borderRadius: 22,
-    gap: 8,
+    gap: 10,
+    marginTop: 12,
   },
   sectionTitle: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '700',
     textAlign: 'right',
   },
   areaHeader: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
+  },
+  areaIconWrap: {
+    width: 30,
+    height: 30,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   areaText: {
     fontSize: 13,
     lineHeight: 20,
     textAlign: 'right',
   },
-  switchCard: {
-    padding: 18,
-    borderRadius: 22,
-    gap: 14,
-  },
-  switchHeader: {
-    flexDirection: 'row-reverse',
-    alignItems: 'center',
-    gap: 12,
-  },
-  switchIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  switchCopy: {
-    flex: 1,
-    alignItems: 'flex-end',
-    gap: 2,
-  },
-  switchTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    textAlign: 'right',
-  },
-  switchSubtitle: {
-    fontSize: 12,
-    textAlign: 'right',
-  },
   signOutCard: {
-    paddingHorizontal: 16,
-    paddingVertical: 4,
     borderRadius: 22,
+    overflow: 'hidden',
+    marginTop: 12,
   },
   brandFooter: {
     alignItems: 'center',
+    paddingVertical: 24,
     gap: 8,
-    marginTop: 14,
-    marginBottom: 8,
   },
   footerLogo: {
-    marginBottom: 2,
+    marginBottom: 4,
   },
   versionText: {
-    fontSize: 11,
-    lineHeight: 18,
+    fontSize: 12,
     textAlign: 'center',
-    paddingHorizontal: 12,
-    marginTop: 2,
   },
 });

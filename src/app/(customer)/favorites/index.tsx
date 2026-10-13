@@ -10,8 +10,8 @@ import { StoreRepository } from '@/features/restaurants/domain/repositories/Stor
 import { SupabaseStoreRepository } from '@/features/restaurants/infrastructure/SupabaseStoreRepository';
 import { Store } from '@/features/restaurants/domain/entities/Store';
 import { Product } from '@/features/products/domain/entities/Product';
-import { FavoriteStoreCard } from '@/features/favorites/presentation/FavoriteStoreCard';
-import { FavoriteProductCard } from '@/features/favorites/presentation/FavoriteProductCard';
+import { StoreCard } from '@/features/restaurants/presentation/StoreCard';
+import { ProductCard } from '@/features/products/presentation/ProductCard';
 import { useSelectedArea } from '@/features/areas/application/hooks/useSelectedArea';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
@@ -30,6 +30,7 @@ import {
 import { Icon } from '@/shared/ui/components/Icon';
 import {
   SkeletonCard,
+  SkeletonItem,
   listEntrance,
   useEntranceAnimation,
 } from '@/shared/ui/motion';
@@ -118,12 +119,13 @@ export default function FavoritesScreen() {
   const renderRow = ({ item, index }: { item: Store | Product; index: number }) => (
     <ListCell index={index} itemKey={`${'storeId' in item ? 'p' : 's'}-${item.id}`}>
       {'storeId' in item ? (
-        <FavoriteProductCard
+        <ProductCard
           product={item}
+          storeIsOpen={areaMapStores?.find((s) => s.id === item.storeId)?.isOpen ?? true}
           onPress={() => router.push(`/product/${item.id}`)}
         />
       ) : (
-        <FavoriteStoreCard
+        <StoreCard
           store={item}
           onPress={() => router.push(`/(customer)/(home)/store/${item.id}`)}
         />
@@ -185,12 +187,14 @@ export default function FavoritesScreen() {
 
       {isLoading ? (
         <View style={styles.listContent}>
-          {[0, 1, 2].map((i) => (
-            <SkeletonCard
-              key={i}
-              style={{ height: 120, borderRadius: 20 }}
-            />
-          ))}
+          {tab === 'products'
+            ? [0, 1, 2].map((i) => <SkeletonItem key={i} />)
+            : [0, 1, 2].map((i) => (
+                <SkeletonCard
+                  key={i}
+                  style={{ height: 110, borderRadius: 20 }}
+                />
+              ))}
         </View>
       ) : isError ? (
         <View style={styles.errorContainer}>

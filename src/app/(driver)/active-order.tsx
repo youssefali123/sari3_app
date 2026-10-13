@@ -145,7 +145,7 @@ export default function ActiveOrderScreen() {
         <BrandHeader title="طلباتي النشطة" subtitle="توصيلاتك الحالية" />
         <View style={styles.centerContainer}>
           <EmptyState
-            emoji="🛵"
+            icon="bicycle"
             title="لا توجد توصيلات نشطة"
             message="اقبل طلباً من قائمة الطلبات المتاحة ليظهر هنا وتتابع مراحل توصيله."
             action={

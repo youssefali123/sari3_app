@@ -20,6 +20,9 @@ function mapIconName(name: string): string {
     case 'arrow-forward':
     case 'arrow-left':
       return 'ArrowRight';
+    case 'log-in':
+    case 'log-in-outline':
+      return 'LogIn';
     case 'arrow-back':
       return 'ArrowLeft';
     case 'chevron-back':
@@ -374,18 +377,20 @@ export function EmptyState({
   title,
   message,
   icon = 'receipt-outline',
+  action,
 }: {
   title: string;
   message: string;
   icon?: string;
+  action?: ReactNode;
 }) {
   const colors = useColors();
   const { theme } = useTheme();
 
   return (
     <View style={[styles.emptyState, { backgroundColor: colors.card, borderColor: colors.border }]}>
-      <View style={[styles.emptyIcon, { backgroundColor: colors.secondary }]}>
-        <Icon name={mapIconName(icon)} size={24} color={colors.secondaryForeground} />
+      <View style={[styles.emptyIcon, { backgroundColor: colors.primarySubtle }]}>
+        <Icon name={mapIconName(icon)} size={26} color={colors.primaryPressed} />
       </View>
       <Text
         style={[
@@ -403,6 +408,7 @@ export function EmptyState({
       >
         {message}
       </Text>
+      {action ? <View style={{ marginTop: 12, width: '100%' }}>{action}</View> : null}
     </View>
   );
 }

@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -10,8 +9,11 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { useColors } from '@/shared/ui/hooks/useColors';
+import Animated from 'react-native-reanimated';
+import { useColors, useTheme } from '@/shared/ui/theme';
+import { Icon } from '@/shared/ui/components/Icon';
 import { PrimaryButton } from '@/shared/ui/components/AppUI';
+import { useSmoothKeyboardElevation } from '@/shared/ui/motion';
 
 interface OrderReleaseModalProps {
   visible: boolean;
@@ -22,8 +24,8 @@ interface OrderReleaseModalProps {
 }
 
 /**
- * Self-report flow for an order the driver cannot complete.
- * Elevated to SOURCE design language with RTL layout and Arabic text.
+ * Modern, brand-aligned self-report modal for an order the driver cannot complete.
+ * Uses smooth bottom sheet slide and animated keyboard elevation.
  */
 export function OrderReleaseModal({
   visible,
@@ -33,53 +35,98 @@ export function OrderReleaseModal({
   onClose,
 }: OrderReleaseModalProps) {
   const [reason, setReason] = useState('');
-  const [keyboardPadding, setKeyboardPadding] = useState(0);
   const colors = useColors();
+  const { theme } = useTheme();
+  const animatedKeyboardStyle = useSmoothKeyboardElevation();
+
   const trimmed = reason.trim();
   const valid = trimmed !== '';
 
-  useEffect(() => {
-    if (Platform.OS !== 'android') return;
-    const showListener = Keyboard.addListener('keyboardDidShow', (e) => {
-      setKeyboardPadding(e.endCoordinates.height);
-    });
-    const hideListener = Keyboard.addListener('keyboardDidHide', () => {
-      setKeyboardPadding(0);
-    });
-    return () => {
-      showListener.remove();
-      hideListener.remove();
-    };
-  }, []);
+  const handleClose = () => {
+    Keyboard.dismiss();
+    onClose();
+  };
+
+  const handleSubmit = () => {
+    if (!valid || isSubmitting) return;
+    Keyboard.dismiss();
+    onSubmit(trimmed);
+  };
 
   return (
     <Modal
       visible={visible}
       animationType="slide"
       transparent
-      onRequestClose={onClose}
+      statusBarTranslucent
+      onRequestClose={handleClose}
     >
-      <KeyboardAvoidingView
-        style={styles.backdrop}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      >
-        <View
+      <View style={styles.backdrop}>
+        {/* Tap outside to dismiss */}
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={handleClose}
+          accessibilityRole="none"
+          accessibilityLabel="إلغاء"
+        />
+
+        <Animated.View
           style={[
             styles.sheet,
             {
               backgroundColor: colors.card,
-              paddingBottom: 24 + keyboardPadding,
+              borderColor: colors.border,
             },
+            animatedKeyboardStyle,
           ]}
         >
-          <View style={[styles.indicator, { backgroundColor: colors.border }]} />
-          <Text style={[styles.title, { color: colors.foreground }]}>
-            الاعتذار عن توصيل الطلب؟
-          </Text>
-          <Text style={[styles.description, { color: colors.mutedForeground }]}>
-            سيعود الطلب مباشرة إلى قائمة الطلبات المتاحة ليتمكن سائق آخر من استلامه. يرجى ذكر سبب عدم التمكن من إكمال التوصيل.
-          </Text>
+          {/* Top handle bar */}
+          <View
+            style={[
+              styles.handle,
+              { backgroundColor: colors.mutedForeground, opacity: 0.25 },
+            ]}
+          />
 
+          {/* Warning Icon Badge */}
+          <View style={styles.header}>
+            <View
+              style={[
+                styles.iconBadge,
+                {
+                  backgroundColor: colors.destructive + '18',
+                  borderColor: colors.destructive + '35',
+                },
+              ]}
+            >
+              <Icon name="AlertTriangle" size={24} color={colors.destructive} />
+            </View>
+
+            <Text
+              style={[
+                styles.title,
+                {
+                  color: colors.foreground,
+                  fontFamily: theme.typography.headingSmall.fontFamily,
+                },
+              ]}
+            >
+              الاعتذار عن توصيل الطلب؟
+            </Text>
+            <Text
+              style={[
+                styles.description,
+                {
+                  color: colors.mutedForeground,
+                  fontFamily: theme.typography.bodyMedium.fontFamily,
+                },
+              ]}
+            >
+              سيعود الطلب مباشرة إلى قائمة الطلبات المتاحة ليتمكن كابتن آخر من استلامه. يرجى كتابة سبب الاعتذار أدناه.
+            </Text>
+          </View>
+
+          {/* Reason Input */}
           <TextInput
             style={[
               styles.input,
@@ -87,50 +134,83 @@ export function OrderReleaseModal({
                 borderColor: colors.border,
                 backgroundColor: colors.background,
                 color: colors.foreground,
+                fontFamily: theme.typography.bodyMedium.fontFamily,
               },
             ]}
             value={reason}
             onChangeText={setReason}
-            placeholder="اكتب سبب الاعتذار (مطلوب)"
+            placeholder="اكتب سبب الاعتذار بالتفصيل (مطلوب)"
             placeholderTextColor={colors.mutedForeground}
             multiline
+            numberOfLines={3}
             textAlign="right"
             textAlignVertical="top"
             editable={!isSubmitting}
           />
-          {!valid ? (
-            <Text style={[styles.hint, { color: colors.mutedForeground }]}>
+
+          {!valid && reason.length > 0 ? (
+            <Text
+              style={[
+                styles.hint,
+                {
+                  color: colors.destructive,
+                  fontFamily: theme.typography.caption.fontFamily,
+                },
+              ]}
+            >
               * كتابة السبب مطلوبة لإعادة إتاحة الطلب.
             </Text>
           ) : null}
 
           {error ? (
-            <Text style={[styles.errorText, { color: colors.destructive }]}>
+            <Text
+              style={[
+                styles.errorText,
+                {
+                  color: colors.destructive,
+                  fontFamily: theme.typography.caption.fontFamily,
+                },
+              ]}
+            >
               {error.message}
             </Text>
           ) : null}
 
+          {/* Action buttons */}
           <View style={styles.actions}>
             <PrimaryButton
               title="تأكيد الاعتذار وإعادة الطلب"
               loading={isSubmitting}
-              onPress={() => onSubmit(trimmed)}
+              disabled={!valid || isSubmitting}
+              onPress={handleSubmit}
             />
+
             <Pressable
-              onPress={onClose}
+              onPress={handleClose}
               disabled={isSubmitting}
               style={({ pressed }) => [
                 styles.cancelButton,
-                { borderColor: colors.border, opacity: pressed ? 0.7 : 1 },
+                {
+                  borderColor: colors.border,
+                  backgroundColor: pressed ? colors.muted : 'transparent',
+                },
               ]}
             >
-              <Text style={[styles.cancelText, { color: colors.foreground }]}>
+              <Text
+                style={[
+                  styles.cancelText,
+                  {
+                    color: colors.foreground,
+                    fontFamily: theme.typography.button.fontFamily,
+                  },
+                ]}
+              >
                 الاستمرار في التوصيل
               </Text>
             </Pressable>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
@@ -138,42 +218,59 @@ export function OrderReleaseModal({
 const styles = StyleSheet.create({
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 20,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    borderTopWidth: 1,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
     gap: 12,
   },
-  indicator: {
+  handle: {
     width: 44,
-    height: 5,
+    height: 4.5,
     borderRadius: 3,
     alignSelf: 'center',
-    marginBottom: 6,
+    marginBottom: 8,
+  },
+  header: {
+    alignItems: 'center',
+    gap: 6,
+  },
+  iconBadge: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
   },
   title: {
     fontSize: 18,
     fontWeight: '800',
-    textAlign: 'right',
+    textAlign: 'center',
   },
   description: {
     fontSize: 13,
     lineHeight: 20,
-    textAlign: 'right',
+    textAlign: 'center',
+    paddingHorizontal: 8,
   },
   input: {
     borderWidth: 1,
     borderRadius: 16,
     padding: 14,
-    minHeight: 100,
+    minHeight: 88,
     fontSize: 14,
     marginTop: 4,
   },
   hint: {
-    fontSize: 11,
+    fontSize: 12,
     textAlign: 'right',
   },
   errorText: {
@@ -186,7 +283,7 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     minHeight: 48,
-    borderRadius: 16,
+    borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',

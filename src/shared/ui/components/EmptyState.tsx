@@ -1,52 +1,127 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+import { useTheme, useColors } from '../theme';
+import { Icon } from './Icon';
 
-interface EmptyStateProps {
+export interface EmptyStateProps {
   title: string;
   message?: string;
   emoji?: string;
+  icon?: string;
   /** Optional action element (e.g. a button) rendered under the message. */
   action?: React.ReactNode;
 }
 
 /**
  * Themed empty state (feature 009 US1, contracts §14). Fully tokenized —
- * zero hardcoded colors/typography/spacing.
+ * supports Lucide icons with Sari3 brand gold badges as well as emoji fallbacks.
  */
-export function EmptyState({ title, message, emoji = '📭', action }: EmptyStateProps) {
+export function EmptyState({
+  title,
+  message,
+  emoji,
+  icon,
+  action,
+}: EmptyStateProps) {
   const { theme } = useTheme();
-  const styles = createStyles(theme);
+  const colors = useColors();
+
   return (
     <View style={styles.container}>
-      <Text style={styles.emoji}>{emoji}</Text>
-      <Text style={styles.title}>{title}</Text>
-      {message ? <Text style={styles.message}>{message}</Text> : null}
-      {action}
+      {icon ? (
+        <View
+          style={[
+            styles.iconBadge,
+            {
+              backgroundColor: colors.primarySubtle,
+              borderColor: 'rgba(245, 189, 22, 0.35)',
+            },
+          ]}
+        >
+          <Icon name={icon} size={28} color={colors.primaryPressed} />
+        </View>
+      ) : emoji ? (
+        <Text style={styles.emoji}>{emoji}</Text>
+      ) : (
+        <View
+          style={[
+            styles.iconBadge,
+            {
+              backgroundColor: colors.primarySubtle,
+              borderColor: 'rgba(245, 189, 22, 0.35)',
+            },
+          ]}
+        >
+          <Icon name="Inbox" size={28} color={colors.primaryPressed} />
+        </View>
+      )}
+
+      <Text
+        style={[
+          styles.title,
+          {
+            color: colors.foreground,
+            fontFamily: theme.typography.headingSmall.fontFamily,
+          },
+        ]}
+      >
+        {title}
+      </Text>
+
+      {message ? (
+        <Text
+          style={[
+            styles.message,
+            {
+              color: colors.mutedForeground,
+              fontFamily: theme.typography.bodyMedium.fontFamily,
+            },
+          ]}
+        >
+          {message}
+        </Text>
+      ) : null}
+
+      {action ? <View style={styles.actionWrap}>{action}</View> : null}
     </View>
   );
 }
 
-const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
-  StyleSheet.create({
-    container: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: theme.spacing.xl,
-    },
-    emoji: {
-      fontSize: 48,
-      marginBottom: theme.spacing.md,
-    },
-    title: {
-      ...theme.typography.headingSmall,
-      color: theme.colors.textPrimary,
-      textAlign: 'center',
-      marginBottom: theme.spacing.xs,
-    },
-    message: {
-      ...theme.typography.bodyMedium,
-      color: theme.colors.textSecondary,
-      textAlign: 'center',
-    },
-  });
+const styles = StyleSheet.create({
+  container: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+  },
+  iconBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  emoji: {
+    fontSize: 48,
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  message: {
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: 'center',
+    maxWidth: 320,
+  },
+  actionWrap: {
+    marginTop: 18,
+    width: '100%',
+    maxWidth: 300,
+  },
+});

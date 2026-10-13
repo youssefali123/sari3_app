@@ -1,16 +1,17 @@
 import React from 'react';
 import { ActivityIndicator, StyleSheet, Switch, Text, View } from 'react-native';
-import { useColors } from '@/shared/ui/hooks/useColors';
+import { useColors, useTheme } from '@/shared/ui/theme';
 import { Surface } from '@/shared/ui/components/AppUI';
 import { useDriverAvailability } from '../../application/hooks/useDriverAvailability';
 
 /**
  * Available / Offline switch bound to the driver's server-side availability.
- * Elevated to SOURCE design language with RTL layout and Arabic status labels.
+ * Elevated to Sari3 design language with RTL layout, brand gold accents, and Tajawal typography.
  */
 export function AvailabilityToggle() {
   const { isAvailable, toggle, isToggling, error } = useDriverAvailability();
   const colors = useColors();
+  const { theme } = useTheme();
 
   return (
     <View style={styles.container}>
@@ -18,8 +19,8 @@ export function AvailabilityToggle() {
         style={[
           styles.card,
           {
-            backgroundColor: isAvailable ? colors.secondary : colors.card,
-            borderColor: colors.border,
+            backgroundColor: isAvailable ? colors.primarySubtle : colors.card,
+            borderColor: isAvailable ? colors.primary : colors.border,
           },
         ]}
       >
@@ -29,14 +30,17 @@ export function AvailabilityToggle() {
               <View
                 style={[
                   styles.statusDot,
-                  { backgroundColor: isAvailable ? colors.secondaryForeground : colors.mutedForeground },
+                  {
+                    backgroundColor: isAvailable ? '#27AE60' : colors.mutedForeground,
+                  },
                 ]}
               />
               <Text
                 style={[
                   styles.label,
                   {
-                    color: isAvailable ? colors.secondaryForeground : colors.foreground,
+                    color: colors.foreground,
+                    fontFamily: theme.typography.headingSmall.fontFamily,
                   },
                 ]}
               >
@@ -47,12 +51,13 @@ export function AvailabilityToggle() {
               style={[
                 styles.subtitle,
                 {
-                  color: isAvailable ? colors.secondaryForeground + 'B3' : colors.mutedForeground,
+                  color: isAvailable ? colors.foreground : colors.mutedForeground,
+                  fontFamily: theme.typography.caption.fontFamily,
                 },
               ]}
             >
               {isAvailable
-                ? 'أنت جاهز لتلقي طلبات التوصيل الجديدة'
+                ? 'أنت جاهز لتلقي طلبات التوصيل الجديدة حولك'
                 : 'قم بتفعيل المفتاح لبدء استقبال الطلبات'}
             </Text>
           </View>
@@ -64,13 +69,25 @@ export function AvailabilityToggle() {
               value={isAvailable}
               onValueChange={toggle}
               disabled={isToggling}
-              trackColor={{ false: colors.muted, true: colors.primary }}
-              thumbColor={colors.foreground}
+              trackColor={{ false: colors.border, true: colors.primary }}
+              thumbColor={isAvailable ? '#1A1D20' : colors.card}
             />
           )}
         </View>
       </Surface>
-      {error ? <Text style={[styles.errorText, { color: colors.destructive }]}>{error.message}</Text> : null}
+      {error ? (
+        <Text
+          style={[
+            styles.errorText,
+            {
+              color: colors.destructive,
+              fontFamily: theme.typography.caption.fontFamily,
+            },
+          ]}
+        >
+          {error.message}
+        </Text>
+      ) : null}
     </View>
   );
 }
@@ -83,7 +100,8 @@ const styles = StyleSheet.create({
   },
   card: {
     padding: 14,
-    borderRadius: 18,
+    borderRadius: 20,
+    borderWidth: 1.5,
   },
   row: {
     flexDirection: 'row-reverse',
@@ -102,9 +120,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
   },
   label: {
     fontSize: 15,
