@@ -25,6 +25,7 @@ export { ConfirmDialog } from './ConfirmDialog';
 export { AuthRequiredModal, AuthRequiredView } from './AuthRequiredModal';
 export { AppLogo } from './AppLogo';
 export type { AppLogoProps } from './AppLogo';
+export { AppSplashScreen } from './AppSplashScreen';
 
 // Feature 011 design-identity components (shared across Phase 3 screens)
 export { AppHeader } from './AppHeader';
