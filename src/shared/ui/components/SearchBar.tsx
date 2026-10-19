@@ -42,6 +42,7 @@ export function SearchBar({ value, onChangeText, placeholder = 'Search…' }: Se
         <TouchableOpacity
           style={styles.clearButton}
           onPress={() => onChangeText('')}
+          delayPressIn={0}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="Clear search"

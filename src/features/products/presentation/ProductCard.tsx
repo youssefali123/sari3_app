@@ -1,10 +1,9 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { Product } from '../domain/entities/Product';
 import { FavoriteButton } from '../../favorites/presentation/FavoriteButton';
 import { formatCurrency } from '@/shared/utils/formatting';
-import { cardPress, usePressAnimation } from '@/shared/ui/motion';
 import { useColors } from '@/shared/ui/theme';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
 import { Icon } from '@/shared/ui/components/Icon';
@@ -21,32 +20,42 @@ interface ProductCardProps {
  * RTL layout, rounded 20px card, 80x80 image, bold title, formatted price,
  * favorite heart button, and quick-add button.
  */
-export function ProductCard({ product, storeIsOpen, onPress, onQuickAdd }: ProductCardProps) {
+export const ProductCard = React.memo(function ProductCard({
+  product,
+  storeIsOpen,
+  onPress,
+  onQuickAdd,
+}: ProductCardProps) {
   const colors = useColors();
   const { theme } = useTheme();
-  const { onPressIn, onPressOut, animatedStyle } = usePressAnimation(cardPress);
+  const disabled = !storeIsOpen || !product.isAvailable;
 
   return (
-    <Animated.View style={[styles.wrapper, animatedStyle]}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        disabled={!storeIsOpen || !product.isAvailable}
-        accessibilityRole="button"
-        accessibilityLabel={`${product.name}، ${formatCurrency(product.price)}`}
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-            opacity: (!storeIsOpen || !product.isAvailable) ? 0.6 : 1,
-          },
-        ]}
-      >
+    <Pressable
+      onPress={onPress}
+      unstable_pressDelay={0}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={`${product.name}، ${formatCurrency(product.price)}`}
+      style={({ pressed }) => [
+        styles.card,
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+          opacity: disabled ? 0.6 : pressed ? 0.92 : 1,
+          transform: [{ scale: pressed && !disabled ? 0.985 : 1 }],
+        },
+      ]}
+    >
         <View style={styles.imageWrap}>
           {product.imageUrl ? (
-            <Image source={{ uri: product.imageUrl }} style={styles.image} resizeMode="cover" />
+            <Image
+              source={{ uri: product.imageUrl }}
+              style={styles.image}
+              contentFit="cover"
+              cachePolicy="memory-disk"
+              transition={null}
+            />
           ) : (
             <View
               style={[
@@ -102,10 +111,18 @@ export function ProductCard({ product, storeIsOpen, onPress, onQuickAdd }: Produ
                   e.stopPropagation?.();
                   onQuickAdd();
                 }}
+                unstable_pressDelay={0}
                 accessibilityRole="button"
                 accessibilityLabel={`أضف ${product.name} إلى السلة`}
                 hitSlop={8}
-                style={[styles.addButton, { backgroundColor: colors.primary }]}
+                style={({ pressed }) => [
+                  styles.addButton,
+                  {
+                    backgroundColor: colors.primary,
+                    opacity: pressed ? 0.75 : 1,
+                    transform: [{ scale: pressed ? 0.92 : 1 }],
+                  },
+                ]}
               >
                 <Icon name="Plus" size={17} color={colors.primaryForeground} strokeWidth={2.5} />
               </Pressable>
@@ -113,14 +130,10 @@ export function ProductCard({ product, storeIsOpen, onPress, onQuickAdd }: Produ
           </View>
         </View>
       </Pressable>
-    </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  wrapper: {
-    marginBottom: 11,
-  },
   card: {
     minHeight: 105,
     borderRadius: 20,

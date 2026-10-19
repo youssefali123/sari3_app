@@ -9,7 +9,7 @@ interface ThemeContextValue {
   isDark: boolean;
 }
 
-const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
+export const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 /**
  * Theme provider (feature 009 US2). The mode FOLLOWS the OS color scheme

@@ -1,42 +1,46 @@
 import React from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { CartItemRow } from '@/features/cart/presentation/CartItemRow';
 import { StoreConflictModal } from '@/features/cart/presentation/StoreConflictModal';
 import {
   removeItem,
+  selectCartItemCount,
   selectCartItems,
   selectCartStoreName,
   selectCartSubtotal,
   updateQuantity,
 } from '@/features/cart/application/cartSlice';
 import { useAppDispatch, useAppSelector } from '@/shared/lib/store';
-import { useColors, useTheme } from '@/shared/ui/theme';
+import { useColors } from '@/shared/ui/theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AppScreen, BrandHeader, EmptyState, PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
 import { StickyBar } from '@/shared/ui/components/StickyBar';
 import { formatCurrencyCompact } from '@/shared/utils/formatting';
 
 export default function CartScreen() {
-  const router = useRouter();
+  const router = useAppRouter();
+  const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const { user } = useAuth();
-  const { theme } = useTheme();
   const colors = useColors();
-  const styles = createStyles(theme);
   const items = useAppSelector(selectCartItems);
   const storeName = useAppSelector(selectCartStoreName);
   const subtotal = useAppSelector(selectCartSubtotal);
+  const itemCount = useAppSelector(selectCartItemCount);
+
+  const tabBarHeight = 74 + Math.max(insets.bottom, 12);
 
   const proceedToCheckout = () => {
     if (!user) {
       router.push({
         pathname: '/(auth)/login',
-        params: { returnTo: '/(customer)/checkout' },
+        params: { returnTo: '/checkout' },
       });
       return;
     }
-    router.push('/(customer)/checkout');
+    router.push('/checkout');
   };
 
   if (items.length === 0) {
@@ -61,16 +65,19 @@ export default function CartScreen() {
     );
   }
 
-  const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
   const subtitle = `${itemCount} ${itemCount === 1 ? 'صنف' : itemCount === 2 ? 'صنفان' : 'أصناف'}`;
 
   return (
     <AppScreen>
       <BrandHeader title="سلة الطلبات" subtitle={subtitle} />
       <FlatList
+        style={styles.container}
         data={items}
         keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: tabBarHeight + 70 },
+        ]}
         showsVerticalScrollIndicator={false}
         ListHeaderComponent={
           storeName ? (
@@ -114,7 +121,7 @@ export default function CartScreen() {
         }
       />
 
-      <StickyBar>
+      <StickyBar bottomOffset={tabBarHeight}>
         <PrimaryButton
           title={`متابعة الطلب · ${formatCurrencyCompact(subtotal)}`}
           icon="checkmark-circle-outline"
@@ -128,8 +135,7 @@ export default function CartScreen() {
   );
 }
 
-const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
-  StyleSheet.create({
+const styles = StyleSheet.create({
     container: {
       flex: 1,
     },

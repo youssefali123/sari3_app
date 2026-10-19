@@ -11,6 +11,7 @@ import type { StackAnimationTypes } from 'react-native-screens';
 
 export interface ScreenTransitionOptions {
   animation?: StackAnimationTypes;
+  animationDuration?: number;
   /** Presentation union accepted by native-stack `screenOptions`. */
   presentation?:
     | 'card'
@@ -21,21 +22,37 @@ export interface ScreenTransitionOptions {
     | 'fullScreenModal'
     | 'formSheet'
     | 'pageSheet';
+  gestureEnabled?: boolean;
+  fullScreenGestureEnabled?: boolean;
 }
 
 export const screenTransitions = {
-  /** Cross-fade — direction-neutral surfaces. */
-  fade: { animation: 'fade' } as ScreenTransitionOptions,
-  /** Subtle horizontal slide — mirrored automatically under RTL (FR-009). */
+  /** Snappy cross-fade — direction-neutral surfaces (180ms). */
+  fade: {
+    animation: 'fade',
+    animationDuration: 180,
+  } as ScreenTransitionOptions,
+  /**
+   * Fast, snappy horizontal slide (~200ms, mirrored for RTL with gesture enabled).
+   */
   horizontal: {
     animation: I18nManager.isRTL ? 'slide_from_left' : 'slide_from_right',
+    // animation: Platform.OS === 'android' ? 'none' : 'slide_from_right',
+    // animation: "default",
+    animationDuration: 200,
+    gestureEnabled: true,
+    fullScreenGestureEnabled: true,
   } as ScreenTransitionOptions,
-  /** Subtle vertical slide — details, secondary surfaces. */
-  vertical: { animation: 'slide_from_bottom' } as ScreenTransitionOptions,
+  /** Snappy vertical slide — details, secondary surfaces (220ms). */
+  vertical: {
+    animation: 'slide_from_bottom',
+    animationDuration: 220,
+    gestureEnabled: true,
+  } as ScreenTransitionOptions,
   /** Modal-like layered content — iOS formSheet, modal fallback elsewhere. */
   sheet: (Platform.OS === 'ios'
-    ? { presentation: 'formSheet', animation: 'slide_from_bottom' }
-    : { presentation: 'modal', animation: 'slide_from_bottom' }) as ScreenTransitionOptions,
+    ? { presentation: 'formSheet', animation: 'slide_from_bottom', animationDuration: 240, gestureEnabled: true }
+    : { presentation: 'modal', animation: 'slide_from_bottom', animationDuration: 240, gestureEnabled: true }) as ScreenTransitionOptions,
 } as const;
 
 export type ScreenTransitionPreset = keyof typeof screenTransitions;

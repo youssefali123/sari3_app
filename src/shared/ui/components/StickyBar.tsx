@@ -9,6 +9,8 @@ interface StickyBarProps {
   children: React.ReactNode;
   /** Optional feedback pulse from the shared add-to-cart recipe. */
   pulseStyle?: AnimatedStyle<ViewStyle>;
+  /** Optional offset from bottom (e.g. when floating above a bottom navigation tab bar). */
+  bottomOffset?: number;
 }
 
 /**
@@ -16,14 +18,23 @@ interface StickyBarProps {
  * detail and product detail): brand-gold, extra-large radii, floating above
  * the home indicator with a safe-area inset. The caller owns the content.
  */
-export function StickyBar({ children, pulseStyle }: StickyBarProps) {
+export function StickyBar({ children, pulseStyle, bottomOffset }: StickyBarProps) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const styles = createStyles(theme);
 
+  const effectiveBottom = bottomOffset ?? 0;
+  const paddingBottom = bottomOffset !== undefined ? 0 : Math.max(insets.bottom + 8, 16);
+
   return (
     <View
-      style={[styles.wrap, { paddingBottom: insets.bottom + 8 }]}
+      style={[
+        styles.wrap,
+        {
+          bottom: effectiveBottom,
+          paddingBottom,
+        },
+      ]}
       pointerEvents="box-none"
     >
       <Animated.View style={[styles.bar, pulseStyle]}>{children}</Animated.View>

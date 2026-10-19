@@ -1,5 +1,6 @@
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Platform, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '@/shared/ui/components/Icon';
 import { useColors, useTheme } from '@/shared/ui/theme';
 import { useNetworkStatus } from '../../application/hooks/useNetworkStatus';
@@ -12,8 +13,14 @@ export function OfflineNoticeBanner() {
   const { isConnected } = useNetworkStatus();
   const colors = useColors();
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
 
   if (isConnected) return null;
+
+  const topInset = Math.max(
+    insets.top,
+    Platform.OS === 'android' ? StatusBar.currentHeight ?? 24 : 0,
+  );
 
   return (
     <View
@@ -21,6 +28,7 @@ export function OfflineNoticeBanner() {
         styles.banner,
         {
           backgroundColor: colors.destructive,
+          paddingTop: topInset + 6,
         },
       ]}
     >
@@ -42,10 +50,10 @@ export function OfflineNoticeBanner() {
 
 const styles = StyleSheet.create({
   banner: {
-    flexDirection: 'row',
+    flexDirection: 'row-reverse',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 9,
+    paddingBottom: 8,
     paddingHorizontal: 16,
     gap: 8,
   },

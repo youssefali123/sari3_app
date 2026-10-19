@@ -422,6 +422,7 @@ export function ActiveOrderCard({
       {onRelease && !customerCancelled && !isDelivered && (
         <Pressable
           onPress={onRelease}
+          unstable_pressDelay={0}
           style={({ pressed }) => [styles.releaseButton, { opacity: pressed ? 0.7 : 1 }]}
         >
           <Text

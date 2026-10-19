@@ -29,7 +29,7 @@ interface AvailableOrderCardProps {
  * 20px radius Surface card, RTL layout, Lucide icons, quick accept & decline actions.
  * Never reveals customer address or phone before claim (FR-004 preserved).
  */
-export function AvailableOrderCard({
+export const AvailableOrderCard = React.memo(function AvailableOrderCard({
   order,
   onOpen,
   onClaim,
@@ -43,6 +43,7 @@ export function AvailableOrderCard({
   return (
     <Pressable
       onPress={onOpen}
+      unstable_pressDelay={0}
       style={({ pressed }) => [
         { opacity: pressed ? 0.92 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] },
       ]}
@@ -102,6 +103,7 @@ export function AvailableOrderCard({
             <Pressable
               accessibilityRole="button"
               onPress={onDecline}
+              unstable_pressDelay={0}
               disabled={isDeclining}
               style={({ pressed }) => [
                 styles.declineButton,
@@ -130,6 +132,7 @@ export function AvailableOrderCard({
             <Pressable
               accessibilityRole="button"
               onPress={onClaim}
+              unstable_pressDelay={0}
               disabled={isClaiming}
               style={({ pressed }) => [
                 styles.claimButton,
@@ -163,7 +166,7 @@ export function AvailableOrderCard({
       </Surface>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

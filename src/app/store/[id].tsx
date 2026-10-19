@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
-  Image,
+  FlatList,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -8,9 +9,13 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useQuery } from '@tanstack/react-query';
+import { Image } from 'expo-image';
+import { useLocalSearchParams } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { Store } from '@/features/restaurants/domain/entities/Store';
 import { StoreRepository } from '@/features/restaurants/domain/repositories/StoreRepository';
 import { SupabaseStoreRepository } from '@/features/restaurants/infrastructure/SupabaseStoreRepository';
 import { ProductRepository } from '@/features/products/domain/repositories/ProductRepository';
@@ -35,7 +40,6 @@ import {
   BrandHeader,
   EmptyState,
   ErrorState,
-  LoadingState,
   SectionTitle,
   Surface,
 } from '@/shared/ui/components';
@@ -48,7 +52,9 @@ const productRepository: ProductRepository = new SupabaseProductRepository();
 export default function StoreDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const storeId = id as string;
-  const router = useRouter();
+  const router = useAppRouter();
+  const insets = useSafeAreaInsets();
+  const queryClient = useQueryClient();
   const colors = useColors();
   const { theme } = useTheme();
 
@@ -62,6 +68,21 @@ export default function StoreDetailScreen() {
     queryKey: ['store', storeId],
     queryFn: () => storeRepository.getStoreById(storeId),
     enabled: Boolean(storeId),
+    initialData: () => {
+      // 1. Check home/browse stores cache
+      const queries = queryClient.getQueriesData<Store[]>({ queryKey: ['stores'] });
+      for (const [, storeList] of queries) {
+        const match = storeList?.find((s) => s.id === storeId);
+        if (match) return match;
+      }
+      // 2. Check favorites stores cache
+      const favQueries = queryClient.getQueriesData<Store[]>({ queryKey: ['favoriteStores'] });
+      for (const [, storeList] of favQueries) {
+        const match = storeList?.find((s) => s.id === storeId);
+        if (match) return match;
+      }
+      return undefined;
+    },
   });
 
   const categoriesQuery = useQuery({
@@ -87,6 +108,17 @@ export default function StoreDetailScreen() {
     return products.filter((p) => p.categoryId === selectedCategoryId);
   }, [products, selectedCategoryId]);
 
+  // Precompute category product counts efficiently (O(N) instead of O(N * categories))
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const p of products) {
+      if (p.categoryId) {
+        counts[p.categoryId] = (counts[p.categoryId] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [products]);
+
   const cartBelongsToThisStore = cartStoreId === null || cartStoreId === storeId;
   const visibleCartItems = cartBelongsToThisStore ? cartItems : [];
   const cartCount = visibleCartItems.reduce((sum, item) => sum + item.quantity, 0);
@@ -95,99 +127,71 @@ export default function StoreDetailScreen() {
     0,
   );
 
-  const handleShare = () => {
+  const handleShare = useCallback(() => {
     if (!store) return;
     Share.share({
       message: `${store.name} — اطلب ألذ المأكولات عبر تطبيق سريع!`,
-    }).catch(() => {});
-  };
+    }).catch(() => { });
+  }, [store]);
 
-  const handleQuickAdd = (product: Product) => {
-    if (!store || !storeIsOpen) return;
-    const cartItem: CartItem = {
-      id: generateCartItemId(product.id, null, []),
-      productId: product.id,
-      productName: product.name,
-      variantId: null,
-      variantName: null,
-      baseUnitPrice: product.price,
-      addonIds: [],
-      selectedAddOns: [],
-      quantity: 1,
-      productImageUrl: product.imageUrl,
-    };
-    addItemWithConflictCheck({
-      item: cartItem,
-      storeId: store.id,
-      storeName: store.name,
-    });
-  };
+  const handleProductPress = useCallback(
+    (productId: string) => {
+      router.push(`/product/${productId}`);
+    },
+    [router],
+  );
 
-  if (storeQuery.isLoading) {
-    return (
-      <AppScreen>
-        <BrandHeader title="جاري التحميل…" onBack={() => router.back()} />
-        <SkeletonStoreDetail />
-      </AppScreen>
-    );
-  }
+  const handleQuickAdd = useCallback(
+    (product: Product) => {
+      if (!store || !storeIsOpen) return;
+      const cartItem: CartItem = {
+        id: generateCartItemId(product.id, null, []),
+        productId: product.id,
+        productName: product.name,
+        variantId: null,
+        variantName: null,
+        baseUnitPrice: product.price,
+        addonIds: [],
+        selectedAddOns: [],
+        quantity: 1,
+        productImageUrl: product.imageUrl,
+      };
+      addItemWithConflictCheck({
+        item: cartItem,
+        storeId: store.id,
+        storeName: store.name,
+      });
+    },
+    [store, storeIsOpen, addItemWithConflictCheck],
+  );
 
-  if (storeQuery.isError || !store) {
-    return (
-      <AppScreen>
-        <BrandHeader title="المتجر غير متاح" onBack={() => router.back()} />
-        <View style={styles.centerContainer}>
-          <ErrorState
-            title="تعذر تحميل المتجر"
-            message="حدث خطأ أثناء جلب بيانات المتجر. حاول مرة أخرى."
-            onRetry={() => void storeQuery.refetch()}
-            fullPage
-          />
-        </View>
-      </AppScreen>
-    );
-  }
-
-  return (
-    <AppScreen>
-      <BrandHeader
-        title={store.name}
-        subtitle={store.description || (store.type === 'restaurant' ? 'مطعم' : 'متجر')}
-        onBack={() => router.back()}
-        trailing={
-          <View style={styles.headerActions}>
-            <View style={styles.favBtnWrap}>
-              <FavoriteButton kind="store" targetId={storeId} activeColor={colors.primary} />
-            </View>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="مشاركة المتجر"
-              onPress={handleShare}
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.shareBtn,
-                {
-                  backgroundColor: colors.card,
-                  borderColor: colors.border,
-                  opacity: pressed ? 0.75 : 1,
-                  transform: [{ scale: pressed ? 0.94 : 1 }],
-                },
-              ]}
-            >
-              <Icon name="Share2" size={18} color={colors.foreground} />
-            </Pressable>
-          </View>
-        }
+  const renderProductItem = useCallback(
+    ({ item }: { item: Product }) => (
+      <ProductRow
+        product={item}
+        storeIsOpen={storeIsOpen}
+        onPress={() => handleProductPress(item.id)}
+        onQuickAdd={storeIsOpen ? () => handleQuickAdd(item) : undefined}
       />
+    ),
+    [storeIsOpen, handleProductPress, handleQuickAdd],
+  );
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.contentContainer}
-        keyboardShouldPersistTaps="handled"
-      >
+  const keyExtractor = useCallback((item: Product) => item.id, []);
+
+  const listHeader = useMemo(() => {
+    if (!store) return null;
+    return (
+      <View style={styles.headerContainer}>
         {/* Store Hero Image */}
         {store.imageUrl ? (
-          <Image source={{ uri: store.imageUrl }} style={styles.heroImage} />
+          <Image
+            source={{ uri: store.imageUrl }}
+            style={styles.heroImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={150}
+          />
         ) : (
           <View style={[styles.heroImage, styles.heroPlaceholder, { backgroundColor: colors.secondary }]}>
             <Icon name="ShoppingBasket" size={54} color={colors.secondaryForeground} />
@@ -274,6 +278,7 @@ export default function StoreDetailScreen() {
             >
               <Pressable
                 onPress={() => setSelectedCategoryId('all')}
+                unstable_pressDelay={0}
                 style={({ pressed }) => [
                   styles.categoryPill,
                   selectedCategoryId === 'all'
@@ -296,12 +301,13 @@ export default function StoreDetailScreen() {
               </Pressable>
 
               {categories.map((cat) => {
-                const count = products.filter((p) => p.categoryId === cat.id).length;
+                const count = categoryCounts[cat.id] ?? 0;
                 const active = selectedCategoryId === cat.id;
                 return (
                   <Pressable
                     key={cat.id}
                     onPress={() => setSelectedCategoryId(cat.id)}
+                    unstable_pressDelay={0}
                     style={({ pressed }) => [
                       styles.categoryPill,
                       active
@@ -333,40 +339,139 @@ export default function StoreDetailScreen() {
           title={store.type === 'restaurant' ? 'قائمة الطعام' : 'المنتجات'}
           action={products.length > 0 ? `${filteredProducts.length} صنف` : undefined}
         />
+      </View>
+    );
+  }, [
+    store,
+    storeIsOpen,
+    colors,
+    theme,
+    categories,
+    selectedCategoryId,
+    products.length,
+    categoryCounts,
+    filteredProducts.length,
+  ]);
 
-        {/* Products List */}
-        {productsQuery.isLoading ? (
-          <View style={styles.productsList}>
-            {[0, 1, 2, 3].map((idx) => (
-              <SkeletonItem key={idx} />
-            ))}
-          </View>
-        ) : filteredProducts.length === 0 ? (
-          <EmptyState
-            title="لا توجد منتجات في هذا القسم"
-            message="اختر قسماً آخر أو تصفح باقي الأصناف."
-            emoji="🍽️"
+  const listEmpty = useMemo(() => {
+    if (productsQuery.isLoading) {
+      return (
+        <View style={styles.productsList}>
+          {[0, 1, 2, 3].map((idx) => (
+            <SkeletonItem key={idx} />
+          ))}
+        </View>
+      );
+    }
+    return (
+      <EmptyState
+        title="لا توجد منتجات في هذا القسم"
+        message="اختر قسماً آخر أو تصفح باقي الأصناف."
+        emoji="🍽️"
+      />
+    );
+  }, [productsQuery.isLoading]);
+
+  if (storeQuery.isLoading) {
+    return (
+      <AppScreen>
+        <BrandHeader title="جاري التحميل…" onBack={() => router.back()} />
+        <SkeletonStoreDetail />
+      </AppScreen>
+    );
+  }
+
+  if (storeQuery.isError || !store) {
+    return (
+      <AppScreen>
+        <BrandHeader title="المتجر غير متاح" onBack={() => router.back()} />
+        <View style={styles.centerContainer}>
+          <ErrorState
+            title="تعذر تحميل المتجر"
+            message="حدث خطأ أثناء جلب بيانات المتجر. حاول مرة أخرى."
+            onRetry={() => void storeQuery.refetch()}
+            fullPage
           />
-        ) : (
-          <View style={styles.productsList}>
-            {filteredProducts.map((product) => (
-              <ProductRow
-                key={product.id}
-                product={product}
-                onPress={() => router.push(`/product/${product.id}`)}
-                onQuickAdd={storeIsOpen ? () => void handleQuickAdd(product) : undefined}
-              />
-            ))}
+        </View>
+      </AppScreen>
+    );
+  }
+
+  return (
+    <AppScreen>
+      <BrandHeader
+        title={store.name}
+        subtitle={store.type === 'restaurant' ? 'مطعم' : 'متجر'}
+        onBack={() => router.back()}
+        trailing={
+          <View style={styles.headerActions}>
+            <View
+              style={[
+                styles.favBtnWrap,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <FavoriteButton kind="store" targetId={storeId} />
+            </View>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="مشاركة المتجر"
+              onPress={handleShare}
+              unstable_pressDelay={0}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.shareBtn,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.75 : 1,
+                  transform: [{ scale: pressed ? 0.94 : 1 }],
+                },
+              ]}
+            >
+              <Icon name="Share2" size={18} color={colors.foreground} />
+            </Pressable>
           </View>
-        )}
-      </ScrollView>
+        }
+      />
+
+      <FlatList
+        style={styles.container}
+        data={productsQuery.isLoading ? [] : filteredProducts}
+        renderItem={renderProductItem}
+        keyExtractor={keyExtractor}
+        ListHeaderComponent={listHeader}
+        ListEmptyComponent={listEmpty}
+        contentContainerStyle={[
+          styles.contentContainer,
+          {
+            paddingBottom:
+              (cartCount > 0 ? 110 : 30) +
+              Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 16),
+          },
+        ]}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      />
 
       {/* Floating Bottom Cart Bar */}
       {cartCount > 0 && (
-        <View style={styles.floatingCartWrapper}>
+        <View
+          style={[
+            styles.floatingCartWrapper,
+            {
+              bottom:
+                Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 0) + 16,
+            },
+          ]}
+        >
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/(customer)/cart')}
+            unstable_pressDelay={0}
             style={({ pressed }) => [
               styles.floatingCartBar,
               { backgroundColor: colors.primary, opacity: pressed ? 0.92 : 1 },
@@ -391,6 +496,9 @@ export default function StoreDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   centerContainer: {
     flex: 1,
     paddingHorizontal: 18,
@@ -400,7 +508,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 8,
     paddingBottom: 130,
+  },
+  headerContainer: {
     gap: 16,
+    marginBottom: 8,
   },
   headerActions: {
     flexDirection: 'row-reverse',
@@ -410,6 +521,8 @@ const styles = StyleSheet.create({
   favBtnWrap: {
     width: 38,
     height: 38,
+    borderRadius: 13,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -532,7 +645,6 @@ const styles = StyleSheet.create({
   },
   floatingCartWrapper: {
     position: 'absolute',
-    bottom: 24,
     left: 18,
     right: 18,
   },

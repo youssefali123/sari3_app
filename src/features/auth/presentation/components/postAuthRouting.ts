@@ -12,7 +12,13 @@ export function navigateAfterAuth(returnTo: string, role: UserRole | undefined):
     router.replace('/(driver)/available-orders');
     return;
   }
-  if (returnTo && returnTo.startsWith('/(customer)/')) {
+  if (
+    returnTo &&
+    (returnTo.startsWith('/(customer)/') ||
+      returnTo === '/checkout' ||
+      returnTo.startsWith('/checkout') ||
+      returnTo.startsWith('/product/'))
+  ) {
     router.replace(returnTo as never);
     return;
   }

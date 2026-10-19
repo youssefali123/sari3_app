@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { useColors } from '@/shared/ui/hooks/useColors';
 import {
   AppScreen,
@@ -28,9 +29,9 @@ const STATUS_LABELS: Record<HistoryStatus, string> = {
  */
 export default function DriverDeliveryDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
+  const router = useAppRouter();
   const colors = useColors();
-  const { data, isLoading, error } = useDriverHistory();
+  const { data, isLoading, isRefetching, refetch, error } = useDriverHistory();
 
   if (isLoading) {
     return (
@@ -80,7 +81,10 @@ export default function DriverDeliveryDetailScreen() {
         subtitle={`طلب ${entry.storeName}`}
         onBack={() => router.back()}
       />
-      <PageScroll>
+      <PageScroll
+        refreshing={isRefetching}
+        onRefresh={() => void refetch()}
+      >
         <Surface style={styles.card}>
           <View style={styles.headerRow}>
             <View style={[styles.storeIcon, { backgroundColor: colors.muted }]}>

@@ -1,12 +1,11 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { Store } from '../domain/entities/Store';
 import { FavoriteButton } from '../../favorites/presentation/FavoriteButton';
 import { useColors } from '@/shared/ui/theme';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
 import { Icon } from '@/shared/ui/components/Icon';
-import { cardPress, usePressAnimation } from '@/shared/ui/motion';
 
 interface StoreCardProps {
   store: Store;
@@ -18,10 +17,9 @@ interface StoreCardProps {
  * RTL layout, rounded 20px surfaces, 82x82 hero image with floating favorite heart,
  * star rating, delivery/status details, and chevron navigation cue.
  */
-export function StoreCard({ store, onPress }: StoreCardProps) {
+export const StoreCard = React.memo(function StoreCard({ store, onPress }: StoreCardProps) {
   const colors = useColors();
   const { theme } = useTheme();
-  const { onPressIn, onPressOut, animatedStyle } = usePressAnimation(cardPress);
 
   const subtitle =
     store.category?.trim() ||
@@ -29,107 +27,107 @@ export function StoreCard({ store, onPress }: StoreCardProps) {
     (store.type === 'market' ? 'احتياجاتك اليومية' : 'أطيب الأكلات');
 
   return (
-    <Animated.View style={[styles.wrapper, animatedStyle]}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        accessibilityRole="button"
-        accessibilityLabel={`${store.name}، ${store.isOpen ? 'مفتوح' : 'مغلق'}`}
-        testID={`venue-${store.id}`}
-        style={({ pressed }) => [
-          styles.card,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-            opacity: pressed ? 0.92 : 1,
-          },
-        ]}
-      >
-        <View style={styles.imageWrap}>
-          {store.imageUrl ? (
-            <Image source={{ uri: store.imageUrl }} style={styles.image} resizeMode="cover" />
-          ) : (
-            <View
-              style={[
-                styles.image,
-                styles.imagePlaceholder,
-                { backgroundColor: colors.secondary },
-              ]}
-            >
-              <Icon
-                name={store.type === 'market' ? 'ShoppingBasket' : 'Utensils'}
-                size={30}
-                color={colors.secondaryForeground}
-              />
-            </View>
-          )}
-          <View style={styles.favoriteWrap} pointerEvents="box-none">
-            <FavoriteButton kind="store" targetId={store.id} overlay />
+    <Pressable
+      onPress={onPress}
+      unstable_pressDelay={0}
+      accessibilityRole="button"
+      accessibilityLabel={`${store.name}، ${store.isOpen ? 'مفتوح' : 'مغلق'}`}
+      testID={`venue-${store.id}`}
+      style={({ pressed }) => [
+        styles.card,
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+        },
+        pressed && styles.cardPressed,
+      ]}
+    >
+      <View style={styles.imageWrap}>
+        {store.imageUrl ? (
+          <Image
+            source={{ uri: store.imageUrl }}
+            style={styles.image}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={null}
+          />
+        ) : (
+          <View
+            style={[
+              styles.image,
+              styles.imagePlaceholder,
+              { backgroundColor: colors.secondary },
+            ]}
+          >
+            <Icon
+              name={store.type === 'market' ? 'ShoppingBasket' : 'Utensils'}
+              size={30}
+              color={colors.secondaryForeground}
+            />
           </View>
+        )}
+        <View style={styles.favoriteWrap} pointerEvents="box-none">
+          <FavoriteButton kind="store" targetId={store.id} overlay />
         </View>
+      </View>
 
-        <View style={styles.copy}>
-          <View style={styles.titleRow}>
-            <Text
-              style={[
-                styles.name,
-                { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
-              ]}
-              numberOfLines={1}
-            >
-              {store.name}
-            </Text>
-            {store.rating !== null ? (
-              <View style={styles.ratingRow}>
-                <Icon name="Star" size={13} color="#e4aa12" />
-                <Text
-                  style={[
-                    styles.ratingText,
-                    { color: colors.foreground, fontFamily: theme.typography.caption.fontFamily },
-                  ]}
-                >
-                  {store.rating.toFixed(1)}
-                </Text>
-              </View>
-            ) : null}
-          </View>
-
+      <View style={styles.copy}>
+        <View style={styles.titleRow}>
           <Text
             style={[
-              styles.subtitle,
-              { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
+              styles.name,
+              { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
             ]}
             numberOfLines={1}
           >
-            {subtitle}
+            {store.name}
           </Text>
-
-          <View style={styles.metaRow}>
-            <Text
-              style={[
-                styles.deliveryText,
-                {
-                  color: store.isOpen ? colors.secondaryForeground : colors.destructive,
-                  fontFamily: theme.typography.caption.fontFamily,
-                },
-              ]}
-            >
-              {store.isOpen ? 'توصيل متاح · 20-30 دقيقة' : 'مغلق حالياً'}
-            </Text>
-          </View>
+          {store.rating !== null ? (
+            <View style={styles.ratingRow}>
+              <Icon name="Star" size={13} color="#e4aa12" />
+              <Text
+                style={[
+                  styles.ratingText,
+                  { color: colors.foreground, fontFamily: theme.typography.caption.fontFamily },
+                ]}
+              >
+                {store.rating.toFixed(1)}
+              </Text>
+            </View>
+          ) : null}
         </View>
 
-        <Icon name="ChevronLeft" size={18} color={colors.mutedForeground} />
-      </Pressable>
-    </Animated.View>
+        <Text
+          style={[
+            styles.subtitle,
+            { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
+          ]}
+          numberOfLines={1}
+        >
+          {subtitle}
+        </Text>
+
+        <View style={styles.metaRow}>
+          <Text
+            style={[
+              styles.deliveryText,
+              {
+                color: store.isOpen ? colors.secondaryForeground : colors.destructive,
+                fontFamily: theme.typography.caption.fontFamily,
+              },
+            ]}
+          >
+            {store.isOpen ? 'توصيل متاح · 20-30 دقيقة' : 'مغلق حالياً'}
+          </Text>
+        </View>
+      </View>
+
+      <Icon name="ChevronLeft" size={18} color={colors.mutedForeground} />
+    </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  wrapper: {
-    marginBottom: 11,
-  },
   card: {
     minHeight: 112,
     borderWidth: 1,
@@ -138,6 +136,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 10,
+  },
+  cardPressed: {
+    opacity: 0.88,
+    transform: [{ scale: 0.985 }],
   },
   imageWrap: {
     position: 'relative',

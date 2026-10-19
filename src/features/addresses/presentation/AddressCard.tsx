@@ -35,7 +35,7 @@ function resolveAddressIcon(label: string): string {
  * RTL Surface card with 20px radius, semantic icon container, status badges,
  * and quick edit/delete actions.
  */
-export function AddressCard({
+export const AddressCard = React.memo(function AddressCard({
   address,
   onEdit,
   onDelete,
@@ -59,6 +59,7 @@ export function AddressCard({
         pressed && Boolean(onPress) && { opacity: 0.85, transform: [{ scale: 0.99 }] },
       ]}
       onPress={onPress}
+      unstable_pressDelay={0}
       disabled={!onPress}
       accessibilityRole="button"
       accessibilityLabel={`عنوان ${address.label}: ${address.addressText}`}
@@ -181,7 +182,7 @@ export function AddressCard({
       ) : null}
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

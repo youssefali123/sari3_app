@@ -5,6 +5,12 @@ import { OrderStatus } from '../domain/entities/OrderStatus';
 import { OrderRealtimeService } from '../domain/services/OrderRealtimeService';
 import { Unsubscribe } from '@/shared/types/common';
 
+// supabase-js dedupes channels by name: channel(name) returns the existing,
+// already-subscribed channel, and calling .on() on it throws. Multiple hook
+// instances or rapid remounts subscribe to the same streams, so every
+// subscription must get its own uniquely named channel.
+let channelSeq = 0;
+
 /**
  * Supabase Realtime-backed order event subscriptions. Transport details stay
  * in Infrastructure; updates write directly into the TanStack Query cache
@@ -16,7 +22,7 @@ export class SupabaseOrderRealtimeService implements OrderRealtimeService {
     callback: (status: OrderStatus) => void,
   ): Unsubscribe {
     const channel = supabase
-      .channel(`order-status-${orderId}`)
+      .channel(`order-status-${orderId}-${++channelSeq}`)
       .on(
         'postgres_changes',
         {
@@ -39,13 +45,13 @@ export class SupabaseOrderRealtimeService implements OrderRealtimeService {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }
 
   subscribeToAvailableOrders(callback: (orders: Order[]) => void): Unsubscribe {
     const channel = supabase
-      .channel('available-orders')
+      .channel(`available-orders-${++channelSeq}`)
       .on(
         'postgres_changes',
         {
@@ -64,7 +70,7 @@ export class SupabaseOrderRealtimeService implements OrderRealtimeService {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }
 }

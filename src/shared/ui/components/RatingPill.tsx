@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
@@ -11,9 +11,9 @@ interface RatingPillProps {
  * Green-star rating pill (feature 011 design identity): value + ★ on a
  * success-tinted capsule. Shared by the store info card and list cards.
  */
-export function RatingPill({ rating }: RatingPillProps) {
+export const RatingPill = React.memo(function RatingPill({ rating }: RatingPillProps) {
   const { theme } = useTheme();
-  const styles = createStyles(theme);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <View style={styles.pill} accessibilityLabel={`التقييم ${rating.toFixed(1)} من 5`}>
@@ -23,7 +23,7 @@ export function RatingPill({ rating }: RatingPillProps) {
       </Text>
     </View>
   );
-}
+});
 
 const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   StyleSheet.create({

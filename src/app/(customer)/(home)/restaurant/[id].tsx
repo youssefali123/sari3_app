@@ -5,5 +5,5 @@ import { Redirect, useLocalSearchParams } from 'expo-router';
  */
 export default function RestaurantRedirect() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  return <Redirect href={`/(customer)/(home)/store/${id}`} />;
+  return <Redirect href={`/store/${id}`} />;
 }

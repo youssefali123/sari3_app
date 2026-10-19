@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
@@ -18,7 +18,7 @@ interface CardProps {
  */
 export function Card({ variant = 'default', children, style, onPress, testID }: CardProps) {
   const { theme } = useTheme();
-  const styles = createStyles(theme);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const containerStyle = [
     styles.base,
@@ -33,6 +33,7 @@ export function Card({ variant = 'default', children, style, onPress, testID }: 
       <TouchableOpacity
         style={containerStyle}
         onPress={onPress}
+        delayPressIn={0}
         activeOpacity={0.8}
         accessibilityRole="button"
         testID={testID}

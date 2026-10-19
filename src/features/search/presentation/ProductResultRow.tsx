@@ -1,9 +1,9 @@
 import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { ProductSearchResult } from '../domain/entities/SearchResult';
-import { colors } from '@/shared/ui/theme/colors';
-import { borderRadius, spacing } from '@/shared/ui/theme/spacing';
-import { typography } from '@/shared/ui/theme/typography';
+import { useColors, useTheme } from '@/shared/ui/theme';
+import { Icon } from '@/shared/ui/components/Icon';
 
 interface ProductResultRowProps {
   result: ProductSearchResult;
@@ -11,73 +11,167 @@ interface ProductResultRowProps {
 }
 
 /**
- * Product result row (feature 008 US1/US3): product image, name, and parent
- * store name. Tap navigates directly to the dedicated product screen.
+ * Modern Product result row matching Sari3 design system:
+ * RTL card layout, 20px radius, product badge, store name reference, and expo-image.
  */
-export function ProductResultRow({ result, onPress }: ProductResultRowProps) {
+export const ProductResultRow = React.memo(function ProductResultRow({
+  result,
+  onPress,
+}: ProductResultRowProps) {
+  const colors = useColors();
+  const { theme } = useTheme();
+
   return (
-    <TouchableOpacity style={styles.row} onPress={onPress} activeOpacity={0.7}>
-      {result.imageUrl ? (
-        <Image source={{ uri: result.imageUrl }} style={styles.image} resizeMode="cover" />
-      ) : (
-        <View style={styles.imagePlaceholder}>
-          <Text style={styles.placeholderEmoji}>🍽️</Text>
-        </View>
-      )}
-      <View style={styles.info}>
-        <Text style={styles.name} numberOfLines={1}>
-          {result.name}
-        </Text>
-        <Text style={styles.storeName} numberOfLines={1}>
-          from {result.storeName}
-        </Text>
+    <Pressable
+      style={({ pressed }) => [
+        styles.card,
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+          opacity: pressed ? 0.92 : 1,
+          transform: [{ scale: pressed ? 0.985 : 1 }],
+        },
+      ]}
+      onPress={onPress}
+      unstable_pressDelay={0}
+      accessibilityRole="button"
+      accessibilityLabel={`${result.name} من ${result.storeName}`}
+    >
+      {/* Product Image */}
+      <View style={styles.imageWrap}>
+        {result.imageUrl ? (
+          <Image
+            source={{ uri: result.imageUrl }}
+            style={styles.image}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={null}
+          />
+        ) : (
+          <View style={[styles.imagePlaceholder, { backgroundColor: colors.muted }]}>
+            <Icon name="UtensilsCrossed" size={24} color={colors.mutedForeground} />
+          </View>
+        )}
       </View>
-      <Text style={styles.chevron}>›</Text>
-    </TouchableOpacity>
+
+      {/* Product & Store Info */}
+      <View style={styles.info}>
+        <View style={styles.headerLine}>
+          <Text
+            style={[
+              styles.name,
+              { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
+            ]}
+            numberOfLines={1}
+          >
+            {result.name}
+          </Text>
+        </View>
+
+        {/* Store Reference */}
+        <View style={styles.storeLine}>
+          <Icon name="Store" size={13} color={colors.mutedForeground} />
+          <Text
+            style={[
+              styles.storeName,
+              {
+                color: colors.mutedForeground,
+                fontFamily: theme.typography.caption.fontFamily,
+              },
+            ]}
+            numberOfLines={1}
+          >
+            من متجر: {result.storeName}
+          </Text>
+        </View>
+
+        {/* Badge Row */}
+        <View style={styles.badgeRow}>
+          <View style={[styles.typeBadge, { backgroundColor: colors.secondary }]}>
+            <Icon name="Utensils" size={12} color={colors.secondaryForeground} />
+            <Text style={[styles.typeText, { color: colors.secondaryForeground }]}>
+              صنف / منتج
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Action Chevron */}
+      <View style={styles.chevronWrap}>
+        <Icon name="ChevronLeft" size={20} color={colors.mutedForeground} />
+      </View>
+    </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
+  card: {
+    flexDirection: 'row-reverse',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    gap: spacing.md,
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: 10,
+    gap: 12,
+  },
+  imageWrap: {
+    position: 'relative',
   },
   image: {
-    width: 56,
-    height: 56,
-    borderRadius: borderRadius.md,
+    width: 62,
+    height: 62,
+    borderRadius: 16,
   },
   imagePlaceholder: {
-    width: 56,
-    height: 56,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.background,
+    width: 62,
+    height: 62,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
   info: {
     flex: 1,
-    gap: 2,
+    gap: 4,
+    alignItems: 'flex-end',
+  },
+  headerLine: {
+    width: '100%',
+    alignItems: 'flex-end',
   },
   name: {
-    ...typography.body,
-    color: colors.textPrimary,
-    fontWeight: '600',
+    fontSize: 15,
+    fontWeight: '700',
+    textAlign: 'right',
+  },
+  storeLine: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
   },
   storeName: {
-    ...typography.caption,
-    color: colors.textSecondary,
+    fontSize: 12,
+    textAlign: 'right',
   },
-  chevron: {
-    ...typography.h3,
-    color: colors.textMuted,
+  badgeRow: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
   },
-  placeholderEmoji: {
-    fontSize: 22,
+  typeBadge: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  typeText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  chevronWrap: {
+    paddingLeft: 4,
   },
 });
+

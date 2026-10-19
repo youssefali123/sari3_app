@@ -1,5 +1,5 @@
-import React from 'react';
-import { FlatList, Image, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { FlatList, StyleSheet, Text, TouchableOpacity } from 'react-native';
+import { Image } from 'expo-image';
 import { useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { PromotionRepository } from '../domain/repositories/PromotionRepository';
@@ -38,7 +38,13 @@ export function PromoBannerCarousel() {
           onPress={() => router.push(`/(customer)/(home)/promotion/${item.id}`)}
           activeOpacity={0.8}
         >
-          <Image source={{ uri: item.imageUrl }} style={styles.bannerImage} />
+          <Image
+            source={{ uri: item.imageUrl }}
+            style={styles.bannerImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={null}
+          />
           <Text style={styles.bannerTitle} numberOfLines={1}>
             {item.title}
           </Text>

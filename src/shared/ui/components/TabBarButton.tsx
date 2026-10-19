@@ -1,7 +1,6 @@
 import React, { useCallback } from 'react';
 import {
   GestureResponderEvent,
-  Platform,
   Pressable,
   StyleProp,
   StyleSheet,
@@ -13,7 +12,6 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-import * as Haptics from 'expo-haptics';
 
 export interface TabBarButtonProps {
   children?: React.ReactNode;
@@ -27,8 +25,8 @@ export interface TabBarButtonProps {
 }
 
 /**
- * High-performance, tactile TabBarButton with 0-delay touch feedback,
- * light haptic vibration, and snappy Reanimated spring bounce.
+ * High-performance, tactile TabBarButton with 0-delay touch feedback
+ * and snappy Reanimated spring bounce (vibration disabled per user request).
  */
 export function TabBarButton({
   children,
@@ -44,9 +42,6 @@ export function TabBarButton({
   const handlePressIn = useCallback(() => {
     // Instant tactile compression on touch down (Frame 0)
     scale.value = withTiming(0.91, { duration: 60 });
-    if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => {});
-    }
   }, [scale]);
 
   const handlePressOut = useCallback(() => {

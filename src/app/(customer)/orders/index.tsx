@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
+import { Order } from '@/features/orders/domain/entities/Order';
 import { OrderRepository } from '@/features/orders/domain/repositories/OrderRepository';
 import { SupabaseOrderRepository } from '@/features/orders/infrastructure/SupabaseOrderRepository';
 import { OrderSummaryCard } from '@/features/orders/presentation/OrderSummaryCard';
@@ -23,7 +24,7 @@ const TERMINAL_STATUSES = ['delivered', 'cancelled', 'expired', 'rejected'];
 
 export default function OrderHistoryScreen() {
   useRequireAuth('/(customer)/orders');
-  const router = useRouter();
+  const router = useAppRouter();
   const queryClient = useQueryClient();
   const { user, isLoading: isAuthLoading } = useAuth();
   const customerId = useCurrentCustomerId();
@@ -64,6 +65,38 @@ export default function OrderHistoryScreen() {
       showAlert('تعذر إخفاء الطلب', error instanceof Error ? error.message : 'حاول مرة أخرى.');
     }
   };
+
+  const handleOpenOrder = useCallback(
+    (orderId: string) => {
+      router.push(`/(customer)/orders/${orderId}`);
+    },
+    [router],
+  );
+
+  const handleOrderAgain = useCallback(
+    (order: Order) => {
+      void reorder(order);
+    },
+    [reorder],
+  );
+
+  const handleHideOrder = useCallback((orderId: string) => {
+    setHideTargetId(orderId);
+  }, []);
+
+  const renderItem = useCallback(
+    ({ item }: { item: Order }) => (
+      <OrderSummaryCard
+        order={item}
+        onPress={handleOpenOrder}
+        onOrderAgain={handleOrderAgain}
+        onHide={handleHideOrder}
+      />
+    ),
+    [handleOpenOrder, handleOrderAgain, handleHideOrder],
+  );
+
+  const keyExtractor = useCallback((item: Order) => item.id, []);
 
   if (!isAuthLoading && !user) {
     return (
@@ -152,16 +185,12 @@ export default function OrderHistoryScreen() {
       </View>
 
       <FlatList
+        style={styles.container}
         data={filteredOrders}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <OrderSummaryCard
-            order={item}
-            onPress={() => router.push(`/(customer)/orders/${item.id}`)}
-            onOrderAgain={() => void reorder(item)}
-            onHide={() => setHideTargetId(item.id)}
-          />
-        )}
+        keyExtractor={keyExtractor}
+        refreshing={false}
+        onRefresh={refetch}
+        renderItem={renderItem}
         ListEmptyComponent={
           <EmptyState
             title={showHistory ? 'لا توجد طلبات سابقة' : 'لا توجد طلبات حالية'}
@@ -223,6 +252,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 12,
     paddingBottom: 112,
-    gap: 11,
+    gap: 12,
   },
 });

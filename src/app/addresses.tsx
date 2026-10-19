@@ -3,7 +3,6 @@ import {
   FlatList,
   Keyboard,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -11,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { SavedDeliveryAddress } from '@/features/addresses/domain/entities/SavedDeliveryAddress';
 import { AddressRepository } from '@/features/addresses/domain/repositories/AddressRepository';
 import { SupabaseAddressRepository } from '@/features/addresses/infrastructure/SupabaseAddressRepository';
@@ -19,10 +18,10 @@ import { AddressCard } from '@/features/addresses/presentation/AddressCard';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated from 'react-native-reanimated';
 import { Input } from '@/shared/ui/components/Input';
 import { SkeletonCard, useSmoothKeyboardElevation } from '@/shared/ui/motion';
-import { ErrorView } from '@/shared/ui/components/ErrorView';
 import { ConfirmDialog } from '@/shared/ui/components/ConfirmDialog';
 import { AuthRequiredView } from '@/shared/ui/components/AuthRequiredModal';
 import { Icon } from '@/shared/ui/components/Icon';
@@ -49,8 +48,9 @@ interface EditingState {
  * - Elegant bottom-sheet modal for adding/editing addresses
  */
 export default function SavedAddressesScreen() {
-  useRequireAuth('/(customer)/addresses');
-  const router = useRouter();
+  useRequireAuth('/addresses');
+  const router = useAppRouter();
+  const insets = useSafeAreaInsets();
   const { user, isLoading: isAuthLoading } = useAuth();
   const customerId = useCurrentCustomerId();
   const queryClient = useQueryClient();
@@ -68,8 +68,6 @@ export default function SavedAddressesScreen() {
   const {
     data: addresses,
     isLoading,
-    isError,
-    refetch,
   } = useQuery({
     queryKey: ['addresses', customerId],
     queryFn: () => addressRepository.getAddresses(customerId!),
@@ -136,15 +134,23 @@ export default function SavedAddressesScreen() {
       ? `${addresses.length} ${addresses.length === 1 ? 'عنوان مسجل' : 'عناوين مسجلة'}`
       : 'إدارة مواقع التوصيل';
 
+  const handleBack = () => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(customer)/profile');
+    }
+  };
+
   if (!isAuthLoading && !user) {
     return (
       <AppScreen>
-        <BrandHeader title="عناويني المحفوظة" subtitle="إدارة مواقع التوصيل" onBack={() => router.back()} />
+        <BrandHeader title="عناويني المحفوظة" subtitle="إدارة مواقع التوصيل" onBack={handleBack} />
         <AuthRequiredView
           icon="MapPin"
           title="التسجيل مطلوب"
           message="سجّل دخولك لإضافة وحفظ عناوين التوصيل لتسهيل وتسريع طلباتك."
-          returnTo="/(customer)/addresses"
+          returnTo="/addresses"
         />
       </AppScreen>
     );
@@ -153,7 +159,7 @@ export default function SavedAddressesScreen() {
   if (isLoading) {
     return (
       <AppScreen>
-        <BrandHeader title="عناويني المحفوظة" subtitle="جاري التحميل..." onBack={() => router.back()} />
+        <BrandHeader title="عناويني المحفوظة" subtitle="جاري التحميل..." onBack={handleBack} />
         <View style={styles.listContent}>
           {[0, 1, 2].map((idx) => (
             <SkeletonCard key={idx} style={styles.skeletonCard} />
@@ -163,24 +169,16 @@ export default function SavedAddressesScreen() {
     );
   }
 
-  if (isError) {
-    return (
-      <AppScreen>
-        <BrandHeader title="عناويني المحفوظة" onBack={() => router.back()} />
-        <ErrorView message="تعذر تحميل العناوين المحفوظة. يرجى المحاولة لاحقاً." onRetry={refetch} />
-      </AppScreen>
-    );
-  }
-
   return (
     <AppScreen>
       <BrandHeader
         title="عناويني المحفوظة"
         subtitle={countSubtitle}
-        onBack={() => router.back()}
+        onBack={handleBack}
       />
 
       <FlatList
+        style={styles.container}
         data={addresses ?? []}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
@@ -199,12 +197,24 @@ export default function SavedAddressesScreen() {
             />
           </View>
         }
-        contentContainerStyle={styles.listContent}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: Math.max(insets.bottom + 84, 100) },
+        ]}
         showsVerticalScrollIndicator={false}
       />
 
       {/* Floating Bottom Add Button */}
-      <View style={[styles.bottomBar, { backgroundColor: colors.background, borderColor: colors.border }]}>
+      <View
+        style={[
+          styles.bottomBar,
+          {
+            backgroundColor: colors.background,
+            borderColor: colors.border,
+            paddingBottom: Math.max(insets.bottom, 16),
+          },
+        ]}
+      >
         <PrimaryButton
           title="إضافة عنوان جديد"
           icon="add-circle"
@@ -234,7 +244,10 @@ export default function SavedAddressesScreen() {
           <Animated.View
             style={[
               styles.sheet,
-              { backgroundColor: colors.card },
+              {
+                backgroundColor: colors.card,
+                paddingBottom: Math.max(insets.bottom + 12, 24),
+              },
               animatedKeyboardStyle,
             ]}
           >
@@ -370,6 +383,9 @@ export default function SavedAddressesScreen() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   listContent: {
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -390,7 +406,6 @@ const styles = StyleSheet.create({
     right: 0,
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 16,
     borderTopWidth: 1,
   },
   backdrop: {
@@ -403,7 +418,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
     maxHeight: '85%',
   },
   sheetHeader: {

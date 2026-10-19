@@ -36,6 +36,9 @@ export { OptionRow } from './OptionRow';
 
 export { TabBarButton } from './TabBarButton';
 export type { TabBarButtonProps } from './TabBarButton';
+export { ModernFloatingTabBar } from './ModernFloatingTabBar';
+export type { ModernFloatingTabBarProps } from './ModernFloatingTabBar';
+export { OfflineNoticeBanner } from '@/features/drivers/presentation/components/OfflineNoticeBanner';
 
 // AppUI primitives (SOURCE project parity)
 export {

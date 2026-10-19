@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { BackHandler, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddressRepository } from '@/features/addresses/domain/repositories/AddressRepository';
 import { SupabaseAddressRepository } from '@/features/addresses/infrastructure/SupabaseAddressRepository';
 import { AddressSelectionModal } from '@/features/addresses/presentation/AddressSelectionModal';
@@ -25,7 +26,6 @@ import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
 import { useColors } from '@/shared/ui/theme';
-import { Button } from '@/shared/ui/components/Button';
 import { EmptyState } from '@/shared/ui/components/EmptyState';
 import { Icon } from '@/shared/ui/components/Icon';
 import { AppScreen, BrandHeader, PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
@@ -40,22 +40,37 @@ const orderRepository: OrderRepository = new SupabaseOrderRepository();
 const DELIVERY_FEE = 0; // fixed at 0 in the foundation phase (Principle IX)
 
 /**
- * الدفع (Phase 3 design): delivery address, coupon, order summary, and the
- * confirm CTA — themed in the app identity. All order logic (mutations,
- * address selection, coupon validation) is carried over unchanged; the
- * server remains the final authority on every amount.
+ * الدفع: delivery address, coupon, order summary, and confirm CTA.
+ * Registered as a full root stack screen with horizontal slide transition.
  */
 export default function CheckoutScreen() {
-  // Protected screen: guests are redirected to login with returnTo (FR-003).
-  useRequireAuth('/(customer)/checkout');
-  const router = useRouter();
+  useRequireAuth('/checkout');
+  const router = useAppRouter();
+  const insets = useSafeAreaInsets();
   const dispatch = useAppDispatch();
   const queryClient = useQueryClient();
   const { user, isLoading: isAuthLoading } = useAuth();
   const { theme } = useTheme();
   const colors = useColors();
-  const styles = createStyles(theme);
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const customerId = useCurrentCustomerId();
+
+  const handleBack = useCallback(() => {
+    if (router.canGoBack()) {
+      router.back();
+    } else {
+      router.replace('/(customer)/cart');
+    }
+  }, [router]);
+
+  useEffect(() => {
+    const onBackPress = () => {
+      handleBack();
+      return true;
+    };
+    const sub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => sub.remove();
+  }, [handleBack]);
 
   const items = useAppSelector(selectCartItems);
   const storeId = useAppSelector(selectCartStoreId);
@@ -146,12 +161,12 @@ export default function CheckoutScreen() {
   if (!isAuthLoading && !user) {
     return (
       <AppScreen>
-        <BrandHeader title="الدفع" onBack={() => router.back()} />
+        <BrandHeader title="الدفع" onBack={handleBack} />
         <AuthRequiredView
           icon="Lock"
           title="التسجيل مطلوب"
           message="سجّل دخولك لإتمام عملية الدفع وتأكيد طلبك."
-          returnTo="/(customer)/checkout"
+          returnTo="/checkout"
         />
       </AppScreen>
     );
@@ -160,7 +175,7 @@ export default function CheckoutScreen() {
   if (items.length === 0 || !storeId) {
     return (
       <AppScreen>
-        <BrandHeader title="الدفع" onBack={() => router.back()} />
+        <BrandHeader title="الدفع" onBack={handleBack} />
         <EmptyState
           emoji="🛒"
           title="مفيش حاجة للدفع"
@@ -172,13 +187,20 @@ export default function CheckoutScreen() {
 
   return (
     <AppScreen>
-      <BrandHeader title="الدفع" onBack={() => router.back()} />
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <BrandHeader title="الدفع" onBack={handleBack} />
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: Math.max(insets.bottom + 28, 40) },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Delivery address */}
         <Text style={[styles.sectionTitle, { color: colors.foreground }]}>عنوان التوصيل</Text>
         <TouchableOpacity
           style={[styles.addressCard, { backgroundColor: colors.card, borderColor: colors.border }]}
           onPress={() => setAddressModalVisible(true)}
+          delayPressIn={0}
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel="اختيار عنوان التوصيل"

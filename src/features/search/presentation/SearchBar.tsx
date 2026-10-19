@@ -1,5 +1,12 @@
 import React from 'react';
-import { Pressable, StyleSheet, TextInput, View } from 'react-native';
+import {
+  Pressable,
+  StyleProp,
+  StyleSheet,
+  TextInput,
+  View,
+  ViewStyle,
+} from 'react-native';
 import { useColors } from '@/shared/ui/theme';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
 import { Icon } from '@/shared/ui/components/Icon';
@@ -9,6 +16,12 @@ interface SearchBarProps {
   onChangeText: (text: string) => void;
   placeholder?: string;
   testID?: string;
+  autoFocus?: boolean;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  onSubmitEditing?: () => void;
+  containerStyle?: StyleProp<ViewStyle>;
+  inputRef?: React.Ref<TextInput>;
 }
 
 /**
@@ -21,6 +34,12 @@ export function SearchBar({
   onChangeText,
   placeholder = 'ابحث عن مطعم أو منتج...',
   testID = 'venue-search',
+  autoFocus = false,
+  onFocus,
+  onBlur,
+  onSubmitEditing,
+  containerStyle,
+  inputRef,
 }: SearchBarProps) {
   const colors = useColors();
   const { theme } = useTheme();
@@ -33,10 +52,12 @@ export function SearchBar({
           backgroundColor: colors.card,
           borderColor: colors.border,
         },
+        containerStyle,
       ]}
     >
       <Icon name="Search" size={19} color={colors.mutedForeground} />
       <TextInput
+        ref={inputRef}
         accessibilityLabel={placeholder}
         style={[
           styles.input,
@@ -51,6 +72,10 @@ export function SearchBar({
         placeholderTextColor={colors.mutedForeground}
         autoCapitalize="none"
         autoCorrect={false}
+        autoFocus={autoFocus}
+        onFocus={onFocus}
+        onBlur={onBlur}
+        onSubmitEditing={onSubmitEditing}
         returnKeyType="search"
         textAlign="right"
         testID={testID}
@@ -59,6 +84,7 @@ export function SearchBar({
         <Pressable
           style={[styles.clearButton, { backgroundColor: colors.muted }]}
           onPress={() => onChangeText('')}
+          unstable_pressDelay={0}
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel="مسح البحث"
@@ -95,3 +121,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 });
+

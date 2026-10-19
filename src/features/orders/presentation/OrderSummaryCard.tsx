@@ -1,12 +1,10 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 import { Order } from '../domain/entities/Order';
 import { OrderStatus } from '../domain/entities/OrderStatus';
 import { useColors, useTheme } from '@/shared/ui/theme';
 import { Icon } from '@/shared/ui/components/Icon';
 import { formatCurrency, formatDateTime } from '@/shared/utils/formatting';
-import { cardPress, usePressAnimation } from '@/shared/ui/motion';
 
 const TERMINAL_STATUSES: OrderStatus[] = [
   OrderStatus.Delivered,
@@ -28,17 +26,18 @@ const ARABIC_STATUS_LABELS: Record<string, string> = {
 
 interface OrderSummaryCardProps {
   order: Order;
-  onPress: () => void;
-  onOrderAgain?: () => void;
-  onHide?: () => void;
+  onPress: (orderId: string) => void;
+  onOrderAgain?: (order: Order) => void;
+  onHide?: (orderId: string) => void;
 }
 
 /**
  * Order card matching SOURCE orders list styling:
  * RTL Surface card with 20px radius, store name + chevron, order id + Arabic status pill,
  * item count + formatted total price, and optional terminal actions.
+ * Optimized for rapid 60fps list scrolling with zero Reanimated per-item overhead.
  */
-export function OrderSummaryCard({
+export const OrderSummaryCard = React.memo(function OrderSummaryCard({
   order,
   onPress,
   onOrderAgain,
@@ -46,7 +45,6 @@ export function OrderSummaryCard({
 }: OrderSummaryCardProps) {
   const colors = useColors();
   const { theme } = useTheme();
-  const { onPressIn, onPressOut, animatedStyle } = usePressAnimation(cardPress);
 
   const isTerminal = TERMINAL_STATUSES.includes(order.status);
   const showActions = isTerminal && (onOrderAgain || onHide);
@@ -64,117 +62,121 @@ export function OrderSummaryCard({
       ? colors.destructive
       : colors.primaryPressed;
 
+  const formattedDate = formatDateTime(order.createdAt);
+  const formattedTotal = formatCurrency(order.totalAmount);
+
   return (
-    <Animated.View style={[styles.wrapper, animatedStyle]}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        accessibilityRole="button"
-        accessibilityLabel={`طلب من ${order.storeName}، الحالة: ${statusLabel}`}
-        testID={`order-${order.id}`}
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-          },
-        ]}
-      >
-        <View style={styles.titleLine}>
-          <Icon name="ChevronLeft" size={18} color={colors.mutedForeground} />
+    <Pressable
+      onPress={() => onPress(order.id)}
+      unstable_pressDelay={0}
+      accessibilityRole="button"
+      accessibilityLabel={`طلب من ${order.storeName}، الحالة: ${statusLabel}`}
+      testID={`order-${order.id}`}
+      style={({ pressed }) => [
+        styles.card,
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+          opacity: pressed ? 0.92 : 1,
+          transform: [{ scale: pressed ? 0.985 : 1 }],
+        },
+      ]}
+    >
+      <View style={styles.titleLine}>
+        <Icon name="ChevronLeft" size={18} color={colors.mutedForeground} />
+        <Text
+          style={[
+            styles.storeName,
+            { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
+          ]}
+          numberOfLines={1}
+        >
+          {order.storeName}
+        </Text>
+      </View>
+
+      <View style={styles.metaLine}>
+        <Text
+          style={[
+            styles.smallText,
+            { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
+          ]}
+        >
+          {order.id.slice(0, 8)}... · {formattedDate}
+        </Text>
+        <View style={[styles.statusBadge, { backgroundColor: colors.muted }]}>
           <Text
             style={[
-              styles.storeName,
-              { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
+              styles.statusText,
+              { color: statusColor, fontFamily: theme.typography.caption.fontFamily },
             ]}
-            numberOfLines={1}
           >
-            {order.storeName}
+            {statusLabel}
           </Text>
         </View>
+      </View>
 
-        <View style={styles.metaLine}>
-          <Text
-            style={[
-              styles.smallText,
-              { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
-            ]}
-          >
-            {order.id.slice(0, 8)}... · {formatDateTime(order.createdAt)}
-          </Text>
-          <View style={[styles.statusBadge, { backgroundColor: colors.muted }]}>
-            <Text
-              style={[
-                styles.statusText,
-                { color: statusColor, fontFamily: theme.typography.caption.fontFamily },
+      <View style={styles.priceLine}>
+        <Text
+          style={[
+            styles.smallText,
+            { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
+          ]}
+        >
+          {order.items.length} منتجات
+        </Text>
+        <Text
+          style={[
+            styles.totalText,
+            { color: colors.foreground, fontFamily: theme.typography.price.fontFamily },
+          ]}
+        >
+          {formattedTotal}
+        </Text>
+      </View>
+
+      {showActions ? (
+        <View
+          style={[styles.actionRow, { borderTopColor: colors.border }]}
+          onStartShouldSetResponder={() => true}
+        >
+          {onOrderAgain ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.actionBtn,
+                { backgroundColor: colors.primary, opacity: pressed ? 0.85 : 1 },
               ]}
+              onPress={() => onOrderAgain(order)}
+              unstable_pressDelay={0}
+              hitSlop={8}
             >
-              {statusLabel}
-            </Text>
-          </View>
+              <Text style={[styles.actionBtnText, { color: colors.primaryForeground }]}>
+                اطلب مرة أخرى
+              </Text>
+            </Pressable>
+          ) : null}
+          {onHide ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.hideBtn,
+                { borderColor: colors.border, opacity: pressed ? 0.8 : 1 },
+              ]}
+              onPress={() => onHide(order.id)}
+              unstable_pressDelay={0}
+              hitSlop={8}
+            >
+              <Text style={[styles.hideBtnText, { color: colors.mutedForeground }]}>
+                إخفاء من السجل
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
-
-        <View style={styles.priceLine}>
-          <Text
-            style={[
-              styles.smallText,
-              { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
-            ]}
-          >
-            {order.items.length} منتجات
-          </Text>
-          <Text
-            style={[
-              styles.totalText,
-              { color: colors.foreground, fontFamily: theme.typography.price.fontFamily },
-            ]}
-          >
-            {formatCurrency(order.totalAmount)}
-          </Text>
-        </View>
-
-        {showActions ? (
-          <View style={styles.actionRow}>
-            {onOrderAgain ? (
-              <Pressable
-                style={[styles.actionBtn, { backgroundColor: colors.primary }]}
-                onPress={(e) => {
-                  e.stopPropagation?.();
-                  onOrderAgain();
-                }}
-                hitSlop={8}
-              >
-                <Text style={[styles.actionBtnText, { color: colors.primaryForeground }]}>
-                  اطلب مرة أخرى
-                </Text>
-              </Pressable>
-            ) : null}
-            {onHide ? (
-              <Pressable
-                style={[styles.hideBtn, { borderColor: colors.border }]}
-                onPress={(e) => {
-                  e.stopPropagation?.();
-                  onHide();
-                }}
-                hitSlop={8}
-              >
-                <Text style={[styles.hideBtnText, { color: colors.mutedForeground }]}>
-                  إخفاء من السجل
-                </Text>
-              </Pressable>
-            ) : null}
-          </View>
-        ) : null}
-      </Pressable>
-    </Animated.View>
+      ) : null}
+    </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  wrapper: {
-    marginBottom: 11,
-  },
   card: {
     borderRadius: 20,
     borderWidth: 1,
@@ -226,7 +228,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginTop: 4,
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#eeece5',
     paddingTop: 8,
   },
   actionBtn: {

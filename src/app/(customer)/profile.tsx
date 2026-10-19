@@ -1,6 +1,6 @@
 import React from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { useColors } from '@/shared/ui/hooks/useColors';
@@ -17,7 +17,7 @@ import {
 import { Icon } from '@/shared/ui/components/Icon';
 
 export default function CustomerProfileScreen() {
-  const router = useRouter();
+  const router = useAppRouter();
   // Protected screen: guests are redirected to login with returnTo (FR-003).
   useRequireAuth('/(customer)/profile');
   const { user, profile, signOut, isLoading: isAuthLoading } = useAuth();
@@ -94,7 +94,7 @@ export default function CustomerProfileScreen() {
             icon="location-outline"
             title="عناويني المسجلة"
             detail="إدارة عناوين التوصيل"
-            onPress={() => router.push('/(customer)/addresses' as never)}
+            onPress={() => router.push('/addresses' as never)}
           />
           <ProfileRow
             icon="heart"

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useLocalSearchParams } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { OrderRepository } from '@/features/orders/domain/repositories/OrderRepository';
 import { SupabaseOrderRepository } from '@/features/orders/infrastructure/SupabaseOrderRepository';
@@ -14,7 +15,6 @@ import { ScopedDriverCard } from '@/features/orders/presentation/ScopedDriverCar
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { SkeletonOrderDetail } from '@/shared/ui/motion';
-import { ErrorView } from '@/shared/ui/components/ErrorView';
 import { ConfirmDialog } from '@/shared/ui/components/ConfirmDialog';
 import { showAlert } from '@/shared/utils/alert';
 import { useColors, useTheme } from '@/shared/ui/theme';
@@ -63,7 +63,7 @@ export default function OrderDetailScreen() {
   useRequireAuth('/(customer)/orders');
   const { id } = useLocalSearchParams<{ id: string }>();
   const orderId = id as string;
-  const router = useRouter();
+  const router = useAppRouter();
   const queryClient = useQueryClient();
   const { user, isLoading: isAuthLoading } = useAuth();
   const reorder = useReorder();
@@ -169,8 +169,20 @@ export default function OrderDetailScreen() {
     <AppScreen>
       <BrandHeader title="تتبع الطلب" onBack={() => router.back()} />
       <ScrollView
+        style={styles.container}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={false}
+            onRefresh={() => {
+              refetch();
+              queryClient.invalidateQueries({ queryKey: ['orderDriverInfo', orderId] });
+            }}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+          />
+        }
       >
         {/* Progress Tracker Hero (Matching SOURCE) */}
         <Surface style={styles.heroCard}>

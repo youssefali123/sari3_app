@@ -4,7 +4,8 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { useColors } from '@/shared/ui/hooks/useColors';
 import {
   AppScreen,
@@ -27,15 +28,15 @@ const NOT_AVAILABLE_MESSAGE = 'هذا الطلب لم يعد متاحاً (تم 
  */
 export default function AvailableOrderDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const router = useRouter();
+  const router = useAppRouter();
   const colors = useColors();
-  const { orders, isLoading, claim, isClaiming, error } = useAvailableOrders();
+  const { orders, isLoading, isRefetching, refetch, claim, isClaiming, error } = useAvailableOrders();
   const [notAvailable, setNotAvailable] = useState(false);
 
   const preview = orders.find((o) => o.id === id) ?? null;
 
   const handleAccept = async () => {
-    if (!id) return;
+    if (!id || isClaiming) return;
     try {
       const result = await claim(id);
       if (result.claimed) {
@@ -86,7 +87,10 @@ export default function AvailableOrderDetailScreen() {
         subtitle={`طلب من ${preview.storeName}`}
         onBack={() => router.back()}
       />
-      <PageScroll>
+      <PageScroll
+        refreshing={isRefetching}
+        onRefresh={() => void refetch()}
+      >
         <Surface style={styles.orderCard}>
           <View style={styles.storeHeader}>
             <View style={[styles.storeIcon, { backgroundColor: colors.muted }]}>

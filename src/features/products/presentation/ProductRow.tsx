@@ -1,9 +1,8 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { Product } from '../domain/entities/Product';
 import { formatCurrency } from '@/shared/utils/formatting';
-import { cardPress, usePressAnimation } from '@/shared/ui/motion';
 import { useColors } from '@/shared/ui/theme';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
 import { Icon } from '@/shared/ui/components/Icon';
@@ -23,7 +22,7 @@ interface ProductRowProps {
  * RTL layout, rounded 20px card, 80x80 image, bold title, 2-line description,
  * formatted price, and a quick-add button with brand gold tint.
  */
-export function ProductRow({
+export const ProductRow = React.memo(function ProductRow({
   product,
   storeIsOpen = true,
   onPress,
@@ -33,28 +32,32 @@ export function ProductRow({
 }: ProductRowProps) {
   const colors = useColors();
   const { theme } = useTheme();
-  const { onPressIn, onPressOut, animatedStyle } = usePressAnimation(cardPress);
 
   return (
-    <Animated.View style={[styles.wrapper, animatedStyle]}>
-      <Pressable
-        onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        accessibilityRole="button"
-        accessibilityLabel={`${product.name}، ${formatCurrency(product.price)}`}
-        testID={`product-${product.id}`}
-        style={({ pressed }) => [
-          styles.row,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-            opacity: pressed ? 0.92 : 1,
-          },
-        ]}
-      >
+    <Pressable
+      onPress={onPress}
+      unstable_pressDelay={0}
+      accessibilityRole="button"
+      accessibilityLabel={`${product.name}، ${formatCurrency(product.price)}`}
+      testID={`product-${product.id}`}
+      style={({ pressed }) => [
+        styles.row,
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+          opacity: pressed ? 0.92 : 1,
+          transform: [{ scale: pressed ? 0.985 : 1 }],
+        },
+      ]}
+    >
         {product.imageUrl ? (
-          <Image source={{ uri: product.imageUrl }} style={styles.image} resizeMode="cover" />
+          <Image
+            source={{ uri: product.imageUrl }}
+            style={styles.image}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={null}
+          />
         ) : (
           <View
             style={[
@@ -119,6 +122,7 @@ export function ProductRow({
                   e.stopPropagation?.();
                   onQuickAdd();
                 }}
+                unstable_pressDelay={0}
                 accessibilityRole="button"
                 accessibilityLabel={`أضف ${product.name} إلى السلة`}
                 hitSlop={8}
@@ -138,14 +142,10 @@ export function ProductRow({
           </View>
         </View>
       </Pressable>
-    </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  wrapper: {
-    marginBottom: 11,
-  },
   row: {
     minHeight: 105,
     borderRadius: 20,
@@ -154,6 +154,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 11,
+    marginBottom: 11,
   },
   image: {
     width: 80,

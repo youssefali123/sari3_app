@@ -1,5 +1,6 @@
-import React from 'react';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useMemo } from 'react';
+import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image } from 'expo-image';
 import Animated from 'react-native-reanimated';
 import { FavoriteButton } from './FavoriteButton';
 import { Product } from '../../products/domain/entities/Product';
@@ -17,9 +18,9 @@ interface FavoriteProductCardProps {
  * and price, with the filled brand-gold favorite heart on the end side.
  * Shares the store card's visual language (same radii/shadow/press recipe).
  */
-export function FavoriteProductCard({ product, onPress }: FavoriteProductCardProps) {
+export const FavoriteProductCard = React.memo(function FavoriteProductCard({ product, onPress }: FavoriteProductCardProps) {
   const { theme } = useTheme();
-  const styles = createStyles(theme);
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const { onPressIn, onPressOut, animatedStyle } = usePressAnimation(cardPress);
 
   return (
@@ -28,13 +29,20 @@ export function FavoriteProductCard({ product, onPress }: FavoriteProductCardPro
         onPress={onPress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
+        delayPressIn={0}
         activeOpacity={0.88}
         accessibilityRole="button"
         accessibilityLabel={`المفضلة: ${product.name}، ${formatCurrency(product.price)}`}
         style={styles.touchable}
       >
         {product.imageUrl ? (
-          <Image source={{ uri: product.imageUrl }} style={styles.image} />
+          <Image
+            source={{ uri: product.imageUrl }}
+            style={styles.image}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={null}
+          />
         ) : (
           <View style={[styles.image, styles.imagePlaceholder]}>
             <Text style={styles.imagePlaceholderText}>{product.name.charAt(0)}</Text>
@@ -45,14 +53,14 @@ export function FavoriteProductCard({ product, onPress }: FavoriteProductCardPro
             <Text style={styles.name} numberOfLines={2}>
               {product.name}
             </Text>
-            <FavoriteButton kind="product" targetId={product.id} activeColor={theme.colors.primary} />
+            <FavoriteButton kind="product" targetId={product.id} />
           </View>
           <Text style={styles.price}>{formatCurrency(product.price)}</Text>
         </View>
       </TouchableOpacity>
     </Animated.View>
   );
-}
+});
 
 const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   StyleSheet.create({

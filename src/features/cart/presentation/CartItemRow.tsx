@@ -1,9 +1,10 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import Animated from 'react-native-reanimated';
 import { CartItem } from '../domain/entities/CartItem';
 import { calculateItemTotal } from '../domain/cartUtils';
-import { cardPress, usePressAnimation, useQuantityTick } from '@/shared/ui/motion';
+import { useQuantityTick } from '@/shared/ui/motion';
 import { useColors } from '@/shared/ui/theme';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
 import { Icon } from '@/shared/ui/components/Icon';
@@ -20,27 +21,31 @@ interface CartItemRowProps {
  * RTL Surface card with 74x74 image, title and trash button on top,
  * add-ons list, and bottom row with line total and circular quantity stepper.
  */
-export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowProps) {
+export const CartItemRow = React.memo(function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowProps) {
   const colors = useColors();
   const { theme } = useTheme();
-  const { onPressIn, onPressOut, animatedStyle } = usePressAnimation(cardPress);
   const { tickStyle } = useQuantityTick(item.quantity);
 
   const atMin = item.quantity <= 1;
 
   return (
-    <Animated.View style={[styles.wrapper, animatedStyle]}>
-      <View
-        style={[
-          styles.card,
-          {
-            backgroundColor: colors.card,
-            borderColor: colors.border,
-          },
-        ]}
-      >
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: colors.card,
+          borderColor: colors.border,
+        },
+      ]}
+    >
         {item.productImageUrl ? (
-          <Image source={{ uri: item.productImageUrl }} style={styles.image} resizeMode="cover" />
+          <Image
+            source={{ uri: item.productImageUrl }}
+            style={styles.image}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={null}
+          />
         ) : (
           <View
             style={[
@@ -67,6 +72,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
 
             <Pressable
               onPress={() => onRemove(item.id)}
+              unstable_pressDelay={0}
               accessibilityRole="button"
               accessibilityLabel={`احذف ${item.productName}`}
               hitSlop={8}
@@ -115,6 +121,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
                 accessibilityRole="button"
                 accessibilityLabel="تقليل الكمية"
                 onPress={() => onUpdateQuantity(item.id, item.quantity - 1)}
+                unstable_pressDelay={0}
                 disabled={atMin}
                 hitSlop={8}
                 style={({ pressed }) => [
@@ -140,6 +147,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
                 accessibilityRole="button"
                 accessibilityLabel="زيادة الكمية"
                 onPress={() => onUpdateQuantity(item.id, item.quantity + 1)}
+                unstable_pressDelay={0}
                 hitSlop={8}
                 style={({ pressed }) => [
                   styles.stepperButton,
@@ -152,14 +160,10 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
           </View>
         </View>
       </View>
-    </Animated.View>
   );
-}
+});
 
 const styles = StyleSheet.create({
-  wrapper: {
-    marginBottom: 11,
-  },
   card: {
     minHeight: 96,
     borderRadius: 20,

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 
@@ -17,7 +17,7 @@ interface OptionRowProps {
  * pattern. Used for product add-ons; reusable for any check-style option.
  * The whole row is pressable with a 44pt minimum touch target.
  */
-export function OptionRow({
+export const OptionRow = React.memo(function OptionRow({
   label,
   priceText,
   checked,
@@ -25,13 +25,14 @@ export function OptionRow({
   disabled = false,
 }: OptionRowProps) {
   const { theme } = useTheme();
-  const styles = createStyles(theme);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   return (
     <TouchableOpacity
       style={styles.row}
       onPress={onToggle}
       disabled={disabled}
+      delayPressIn={0}
       activeOpacity={0.7}
       accessibilityRole="checkbox"
       accessibilityState={{ checked, disabled }}
@@ -59,7 +60,7 @@ export function OptionRow({
       </View>
     </TouchableOpacity>
   );
-}
+});
 
 const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   StyleSheet.create({

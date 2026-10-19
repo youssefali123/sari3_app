@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   StyleSheet,
@@ -35,7 +35,7 @@ export function CouponInputSection({
   onRemove,
 }: CouponInputSectionProps) {
   const { theme } = useTheme();
-  const styles = createStyles(theme);
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const [code, setCode] = useState('');
 
   function handleApply() {
@@ -58,7 +58,7 @@ export function CouponInputSection({
               </Text>
             ) : null}
           </View>
-          <TouchableOpacity onPress={onRemove} hitSlop={8}>
+          <TouchableOpacity onPress={onRemove} hitSlop={8} delayPressIn={0}>
             <Text style={styles.removeText}>إزالة</Text>
           </TouchableOpacity>
         </View>
@@ -79,6 +79,7 @@ export function CouponInputSection({
               style={[styles.applyButton, (!code.trim() || isValidating) && styles.applyButtonDisabled]}
               onPress={handleApply}
               disabled={!code.trim() || isValidating}
+              delayPressIn={0}
               accessibilityRole="button"
               accessibilityLabel="تطبيق كود الخصم"
             >

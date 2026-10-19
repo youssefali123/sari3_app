@@ -1,17 +1,19 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  Image,
+  BackHandler,
+  FlatList,
+  Keyboard,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { Image } from 'expo-image';
 import { useQuery } from '@tanstack/react-query';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 
 import { useAreas } from '@/features/areas/application/hooks/useAreas';
 import { useSelectedArea } from '@/features/areas/application/hooks/useSelectedArea';
@@ -20,6 +22,7 @@ import { AreaEmptyState } from '@/features/areas/presentation/AreaEmptyState';
 import { useSearch } from '@/features/search/application/hooks/useSearch';
 import { SearchBar } from '@/features/search/presentation/SearchBar';
 import { SearchResultsList } from '@/features/search/presentation/SearchResultsList';
+import { Store } from '@/features/restaurants/domain/entities/Store';
 import { StoreRepository } from '@/features/restaurants/domain/repositories/StoreRepository';
 import { SupabaseStoreRepository } from '@/features/restaurants/infrastructure/SupabaseStoreRepository';
 import { PopularStoreCard } from '@/features/restaurants/presentation/PopularStoreCard';
@@ -37,11 +40,7 @@ import { EmptyState } from '@/shared/ui/components/EmptyState';
 import { ErrorState } from '@/shared/ui/components/ErrorState';
 import { AppLogo } from '@/shared/ui/components/AppLogo';
 import { SectionTitle, Surface } from '@/shared/ui/components/AppUI';
-import {
-  SkeletonCard,
-  cardPress,
-  usePressAnimation,
-} from '@/shared/ui/motion';
+import { SkeletonCard } from '@/shared/ui/motion';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
 
 const storeRepository: StoreRepository = new SupabaseStoreRepository();
@@ -57,20 +56,37 @@ function greetingForHour(hour: number): string {
 }
 
 export default function HomeScreen() {
-  const router = useRouter();
+  const router = useAppRouter();
   const { theme } = useTheme();
   const colors = useColors();
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
   const [pickerVisible, setPickerVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchActive, setIsSearchActive] = useState(false);
   const reorder = useReorder();
 
   const { selectedAreaId, selectedAreaName, setSelectedArea } = useSelectedArea();
   const { areas, isLoading: areasLoading } = useAreas();
 
   const search = useSearch(selectedAreaId, searchQuery);
-  const isSearchMode = search.isSearchActive;
+  const isSearchOpen = isSearchActive || searchQuery.trim().length > 0;
+
+  const handleCloseSearch = useCallback(() => {
+    setSearchQuery('');
+    setIsSearchActive(false);
+    Keyboard.dismiss();
+  }, []);
+
+  useEffect(() => {
+    if (!isSearchOpen) return;
+    const onBackPress = () => {
+      handleCloseSearch();
+      return true;
+    };
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [isSearchOpen, handleCloseSearch]);
 
   const {
     data: stores,
@@ -101,11 +117,6 @@ export default function HomeScreen() {
     return visible.reduce((latest, o) => (o.createdAt > latest.createdAt ? o : latest));
   }, [orders]);
 
-  const lastOrderStore = useMemo(() => {
-    if (!lastOrder || !stores) return null;
-    return stores.find((s) => s.id === lastOrder.storeId) ?? null;
-  }, [lastOrder, stores]);
-
   const filteredStores = useMemo(() => stores ?? [], [stores]);
 
   const popularStores = useMemo(() => {
@@ -117,10 +128,21 @@ export default function HomeScreen() {
 
   const firstName = profile?.fullName?.trim().split(/\s+/)[0];
   const greetingName = user && firstName ? firstName : '';
-  const greeting = useMemo(() => greetingForHour(new Date().getHours()), []);
+  const greeting = greetingForHour(new Date().getHours());
 
-  const openStore = (storeId: string) =>
-    router.push(`/(customer)/(home)/store/${storeId}`);
+  const openStore = useCallback(
+    (storeId: string) => router.push(`/store/${storeId}`),
+    [router],
+  );
+
+  const renderStoreItem = useCallback(
+    ({ item }: { item: Store }) => (
+      <StoreCard store={item} onPress={() => openStore(item.id)} />
+    ),
+    [openStore],
+  );
+
+  const storeKeyExtractor = useCallback((item: Store) => item.id, []);
 
   // ── Brand Header (Matching SOURCE) ──────────────────────────────────────────
 
@@ -182,111 +204,235 @@ export default function HomeScreen() {
     </View>
   );
 
-  return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {brandHeader}
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
-        {isSearchMode ? (
-          <SearchResultsList
-            query={searchQuery}
-            areaName={selectedAreaName}
-            results={search.results}
-            isLoading={search.isLoading}
-            isError={search.isError}
-            onRetry={() => void search.refetch()}
-            onSelectStore={(storeId) => openStore(storeId)}
-            onSelectProduct={(productId) => router.push(`/product/${productId}`)}
+  const listHeader = useMemo(
+    () => (
+      <View style={styles.listHeaderContainer}>
+        {/* Hero banner with scooter art and greeting badge */}
+        <View style={styles.banner}>
+          <Image
+            source={HERO_BANNER}
+            style={styles.bannerImage}
+            contentFit="contain"
+            transition={null}
           />
-        ) : (
-          <>
-            {/* Hero banner with scooter art and greeting badge */}
-            <View style={styles.banner}>
-              <Image
-                source={HERO_BANNER}
-                style={styles.bannerImage}
-                resizeMode="contain"
-              />
-              <View style={styles.bannerShade} />
-              <View style={styles.bannerText}>
-                <Text
-                  style={[
-                    styles.bannerGreeting,
-                    { fontFamily: theme.typography.label.fontFamily },
-                  ]}
-                >
-                  {greeting}{greetingName ? `، ${greetingName}` : ''}
-                </Text>
-                <Text
-                  style={[
-                    styles.bannerTitle,
-                    { fontFamily: theme.typography.headingLarge.fontFamily },
-                  ]}
-                >
-                  ماذا تريد اليوم؟
-                </Text>
-                <View style={styles.bannerBadge}>
-                  <Icon name="Clock" size={13} color="#191816" />
-                  <Text style={styles.bannerBadgeText}>توصيل سريع لباب بيتك</Text>
-                </View>
-              </View>
+          <View style={styles.bannerShade} />
+          <View style={styles.bannerText}>
+            <Text
+              style={[
+                styles.bannerGreeting,
+                { fontFamily: theme.typography.label.fontFamily },
+              ]}
+            >
+              {greeting}{greetingName ? `، ${greetingName}` : ''}
+            </Text>
+            <Text
+              style={[
+                styles.bannerTitle,
+                { fontFamily: theme.typography.headingLarge.fontFamily },
+              ]}
+            >
+              ماذا تريد اليوم؟
+            </Text>
+            <View style={styles.bannerBadge}>
+              <Icon name="Clock" size={13} color="#191816" />
+              <Text style={styles.bannerBadgeText}>توصيل سريع لباب بيتك</Text>
             </View>
+          </View>
+        </View>
 
-            {/* Category selection row: Restaurants vs Market */}
-            <View style={styles.categoryRow}>
-              <CategoryTile
-                title="مطاعم"
-                subtitle="أطيب الأكلات حولك"
-                icon="Utensils"
-                isActive={false}
-                activeBg="#fff2d1"
-                activeBorder="#f5bd16"
-                iconBg="#f5bd16"
-                iconColor="#191816"
-                onPress={() =>
-                  router.push({
-                    pathname: '/(customer)/(home)/browse',
-                    params: { type: 'restaurant' },
-                  })
-                }
-              />
-              <CategoryTile
-                title="ماركت"
-                subtitle="احتياجاتك اليومية"
-                icon="ShoppingBasket"
-                isActive={false}
-                activeBg={colors.secondary}
-                activeBorder={colors.secondaryForeground}
-                iconBg="#e4efe8"
-                iconColor="#286b47"
-                onPress={() =>
-                  router.push({
-                    pathname: '/(customer)/(home)/browse',
-                    params: { type: 'market' },
-                  })
-                }
-              />
+        {/* Category selection row: Restaurants vs Market */}
+        <View style={styles.categoryRow}>
+          <CategoryTile
+            title="مطاعم"
+            subtitle="أطيب الأكلات حولك"
+            icon="Utensils"
+            isActive={false}
+            activeBg="#fff2d1"
+            activeBorder="#f5bd16"
+            iconBg="#f5bd16"
+            iconColor="#191816"
+            onPress={() =>
+              router.push({
+                pathname: '/(customer)/(home)/browse',
+                params: { type: 'restaurant' },
+              })
+            }
+          />
+          <CategoryTile
+            title="ماركت"
+            subtitle="احتياجاتك اليومية"
+            icon="ShoppingBasket"
+            isActive={false}
+            activeBg={colors.secondary}
+            activeBorder={colors.secondaryForeground}
+            iconBg="#e4efe8"
+            iconColor="#286b47"
+            onPress={() =>
+              router.push({
+                pathname: '/(customer)/(home)/browse',
+                params: { type: 'market' },
+              })
+            }
+          />
+        </View>
+
+        {/* Search Bar Entry Trigger */}
+        <Pressable
+          onPress={() => setIsSearchActive(true)}
+          accessibilityRole="button"
+          accessibilityLabel="البحث عن مطعم أو وجبة"
+          unstable_pressDelay={0}
+        >
+          <View pointerEvents="none">
+            <SearchBar
+              value=""
+              onChangeText={() => {}}
+              placeholder="ابحث عن مطعم أو وجبة..."
+            />
+          </View>
+        </Pressable>
+
+        {/* Promo banner strip */}
+        <Surface style={styles.promoStrip}>
+          <View style={[styles.promoIcon, { backgroundColor: colors.primary }]}>
+            <Icon name="Tag" size={20} color={colors.primaryForeground} />
+          </View>
+          <View style={styles.promoCopy}>
+            <Text
+              style={[
+                styles.promoTitle,
+                { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
+              ]}
+            >
+              عروض وخصومات
+            </Text>
+            <Text
+              style={[
+                styles.smallText,
+                { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
+              ]}
+            >
+              {promotions?.length
+                ? `${promotions[0].title} — استفد الآن`
+                : 'تابع جديد عروضنا وتخفيضاتنا الحصرية'}
+            </Text>
+          </View>
+          <Pressable
+            onPress={() => {
+              if (promotions && promotions.length > 0) {
+                router.push(`/(customer)/(home)/promotion/${promotions[0].id}`);
+              }
+            }}
+          >
+            <Icon name="ArrowLeftCircle" size={28} color={colors.primary} />
+          </Pressable>
+        </Surface>
+
+        {/* Top rated carousel */}
+        {popularStores.length > 0 ? (
+          <View style={styles.sectionWrap}>
+            <SectionTitle
+              title="الأكثر طلباً"
+              action="عرض الكل"
+              onAction={() =>
+                router.push({
+                  pathname: '/(customer)/(home)/browse',
+                  params: { type: 'restaurant' },
+                })
+              }
+            />
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.carouselContainer}
+            >
+              {popularStores.map((store) => (
+                <PopularStoreCard
+                  key={store.id}
+                  store={store}
+                  onPress={() => openStore(store.id)}
+                />
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
+
+        {/* Filtered Store List Section Title */}
+        <View style={styles.sectionWrap}>
+          <SectionTitle title="كل المتاجر القريبة منك" />
+          {storesLoading ? (
+            <View style={styles.listGap}>
+              {[0, 1, 2].map((i) => (
+                <SkeletonCard
+                  key={i}
+                  style={{ height: 112, borderRadius: 20 }}
+                />
+              ))}
             </View>
+          ) : storesError ? (
+            <ErrorState
+              title="تعذر تحميل المتاجر"
+              message="حدث خطأ أثناء جلب المتاجر. حاول مرة أخرى."
+              onRetry={() => void refetchStores()}
+            />
+          ) : null}
+        </View>
+      </View>
+    ),
+    [
+      theme,
+      greeting,
+      greetingName,
+      colors,
+      router,
+      promotions,
+      popularStores,
+      storesLoading,
+      storesError,
+      openStore,
+      refetchStores,
+    ],
+  );
 
-            {/* Search Bar */}
-            <SearchBar value={searchQuery} onChangeText={setSearchQuery} />
+  const listEmpty = useMemo(() => {
+    if (storesLoading || storesError) return null;
+    return (
+      <EmptyState
+        title="لا توجد متاجر"
+        message={
+          selectedAreaId
+            ? 'لا توجد متاجر مطابقة في منطقتك الحالية.'
+            : 'اختر منطقتك لتظهر لك المتاجر القريبة.'
+        }
+        action={
+          <Button
+            label="اختيار المنطقة"
+            variant="primary"
+            onPress={() => setPickerVisible(true)}
+          />
+        }
+      />
+    );
+  }, [storesLoading, storesError, selectedAreaId]);
 
-            {/* Promo banner strip */}
-            <Surface style={styles.promoStrip}>
-              <View style={[styles.promoIcon, { backgroundColor: colors.primary }]}>
-                <Icon name="Tag" size={20} color={colors.primaryForeground} />
+  const listFooter = useMemo(
+    () => (
+      <View style={styles.listFooterContainer}>
+        {/* Last order reorder card */}
+        {user && lastOrder ? (
+          <Surface style={styles.lastOrderCard}>
+            <View style={styles.lastOrderHeading}>
+              <View style={[styles.lastOrderIcon, { backgroundColor: colors.secondary }]}>
+                <Icon name="ShoppingBag" size={20} color={colors.secondaryForeground} />
               </View>
-              <View style={styles.promoCopy}>
+              <View style={styles.lastOrderCopy}>
                 <Text
                   style={[
-                    styles.promoTitle,
+                    styles.lastOrderStore,
                     { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
                   ]}
                 >
-                  عروض وخصومات
+                  آخر طلب من {lastOrder.storeName}
                 </Text>
                 <Text
                   style={[
@@ -294,141 +440,108 @@ export default function HomeScreen() {
                     { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
                   ]}
                 >
-                  {promotions?.length
-                    ? `${promotions[0].title} — استفد الآن`
-                    : 'تابع جديد عروضنا وتخفيضاتنا الحصرية'}
+                  {lastOrder.items.length} منتجات
                 </Text>
               </View>
-              <Pressable
-                onPress={() => {
-                  if (promotions && promotions.length > 0) {
-                    router.push(`/(customer)/(home)/promotion/${promotions[0].id}`);
-                  }
-                }}
-              >
-                <Icon name="ArrowLeftCircle" size={28} color={colors.primary} />
-              </Pressable>
-            </Surface>
-
-            {/* Top rated carousel */}
-            {popularStores.length > 0 ? (
-              <View style={styles.sectionWrap}>
-                <SectionTitle
-                  title="الأكثر طلباً"
-                  action="عرض الكل"
-                  onAction={() =>
-                    router.push({
-                      pathname: '/(customer)/(home)/browse',
-                      params: { type: 'restaurant' },
-                    })
-                  }
-                />
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.carouselContainer}
-                >
-                  {popularStores.map((store) => (
-                    <PopularStoreCard
-                      key={store.id}
-                      store={store}
-                      onPress={() => openStore(store.id)}
-                    />
-                  ))}
-                </ScrollView>
-              </View>
-            ) : null}
-
-            {/* Filtered Store List */}
-            <View style={styles.sectionWrap}>
-              <SectionTitle title="كل المتاجر القريبة منك" />
-              {storesLoading ? (
-                <View style={styles.listGap}>
-                  {[0, 1, 2].map((i) => (
-                    <SkeletonCard
-                      key={i}
-                      style={{ height: 112, borderRadius: 20 }}
-                    />
-                  ))}
-                </View>
-              ) : storesError ? (
-                <ErrorState
-                  title="تعذر تحميل المتاجر"
-                  message="حدث خطأ أثناء جلب المتاجر. حاول مرة أخرى."
-                  onRetry={() => void refetchStores()}
-                />
-              ) : filteredStores.length === 0 ? (
-                <EmptyState
-                  title="لا توجد متاجر"
-                  message={
-                    selectedAreaId
-                      ? 'لا توجد متاجر مطابقة في منطقتك الحالية.'
-                      : 'اختر منطقتك لتظهر لك المتاجر القريبة.'
-                  }
-                  action={
-                    <Button
-                      label="اختيار المنطقة"
-                      variant="primary"
-                      onPress={() => setPickerVisible(true)}
-                    />
-                  }
-                />
-              ) : (
-                <View style={styles.listGap}>
-                  {filteredStores.map((store) => (
-                    <StoreCard
-                      key={store.id}
-                      store={store}
-                      onPress={() => openStore(store.id)}
-                    />
-                  ))}
-                </View>
-              )}
             </View>
+            <Button
+              label="اطلب مرة أخرى"
+              variant="primary"
+              onPress={() => void reorder(lastOrder)}
+            />
+          </Surface>
+        ) : null}
 
-            {/* Last order reorder card */}
-            {user && lastOrder ? (
-              <Surface style={styles.lastOrderCard}>
-                <View style={styles.lastOrderHeading}>
-                  <View style={[styles.lastOrderIcon, { backgroundColor: colors.secondary }]}>
-                    <Icon name="ShoppingBag" size={20} color={colors.secondaryForeground} />
-                  </View>
-                  <View style={styles.lastOrderCopy}>
-                    <Text
-                      style={[
-                        styles.lastOrderStore,
-                        { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
-                      ]}
-                    >
-                      آخر طلب من {lastOrder.storeName}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.smallText,
-                        { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
-                      ]}
-                    >
-                      {lastOrder.items.length} منتجات
-                    </Text>
-                  </View>
-                </View>
-                <Button
-                  label="اطلب مرة أخرى"
-                  variant="primary"
-                  onPress={() => void reorder(lastOrder)}
-                />
-              </Surface>
-            ) : null}
+        {!selectedAreaId && stores && stores.length === 0 && !storesLoading ? (
+          <AreaEmptyState
+            areaName={selectedAreaName}
+            onSwitchArea={() => setPickerVisible(true)}
+          />
+        ) : null}
+      </View>
+    ),
+    [
+      user,
+      lastOrder,
+      colors,
+      theme,
+      reorder,
+      selectedAreaId,
+      stores,
+      storesLoading,
+      selectedAreaName,
+    ],
+  );
 
-            {!selectedAreaId && stores && stores.length === 0 && !storesLoading ? (
-              <AreaEmptyState
-                areaName={selectedAreaName}
-                onSwitchArea={() => setPickerVisible(true)}
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      {isSearchOpen ? (
+        <View style={styles.searchActiveScreen}>
+          {/* Sticky Search Header with RTL Back button */}
+          <View style={[styles.searchActiveHeader, { paddingTop: insets.top + 8 }]}>
+            <Pressable
+              onPress={handleCloseSearch}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.searchBackBtn,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                  opacity: pressed ? 0.75 : 1,
+                  transform: [{ scale: pressed ? 0.94 : 1 }],
+                },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel="إغلاق البحث والعودة"
+            >
+              <Icon name="ArrowRight" size={20} color={colors.foreground} />
+            </Pressable>
+
+            <View style={styles.searchBarActiveWrap}>
+              <SearchBar
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                autoFocus
+                placeholder="ابحث عن مطعم، كافيه، أو وجبة..."
+                containerStyle={styles.searchBarActiveInput}
               />
-            ) : null}
-          </>
-        )}
-      </ScrollView>
+            </View>
+          </View>
+
+          {/* Search Content */}
+          <View style={styles.searchResultsWrap}>
+            <SearchResultsList
+              query={searchQuery}
+              areaName={selectedAreaName}
+              results={search.results}
+              isLoading={search.isLoading}
+              isError={search.isError}
+              onRetry={() => void search.refetch()}
+              onSelectStore={(storeId) => openStore(storeId)}
+              onSelectProduct={(productId) => router.push(`/product/${productId}`)}
+              onSelectSuggestion={(suggestion) => setSearchQuery(suggestion)}
+            />
+          </View>
+        </View>
+      ) : (
+        <>
+          {brandHeader}
+          <FlatList
+            style={styles.container}
+            data={storesLoading || storesError ? [] : filteredStores}
+            renderItem={renderStoreItem}
+            keyExtractor={storeKeyExtractor}
+            ListHeaderComponent={listHeader}
+            ListEmptyComponent={listEmpty}
+            ListFooterComponent={listFooter}
+            contentContainerStyle={styles.content}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            refreshing={false}
+            onRefresh={refetchStores}
+          />
+        </>
+      )}
 
       <AreaPickerModal
         visible={pickerVisible}
@@ -470,19 +583,19 @@ function CategoryTile({
 }) {
   const colors = useColors();
   const { theme } = useTheme();
-  const { onPressIn, onPressOut, animatedStyle } = usePressAnimation(cardPress);
 
   return (
-    <Animated.View style={[{ flex: 1 }, animatedStyle]}>
+    <View style={{ flex: 1 }}>
       <Pressable
         onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        style={[
+        unstable_pressDelay={0}
+        style={({ pressed }) => [
           styles.categoryTile,
           {
             backgroundColor: isActive ? activeBg : colors.card,
             borderColor: isActive ? activeBorder : colors.border,
+            opacity: pressed ? 0.88 : 1,
+            transform: [{ scale: pressed ? 0.98 : 1 }],
           },
         ]}
       >
@@ -508,7 +621,7 @@ function CategoryTile({
           </Text>
         </View>
       </Pressable>
-    </Animated.View>
+    </View>
   );
 }
 
@@ -574,6 +687,40 @@ const styles = StyleSheet.create({
     paddingTop: 8,
     paddingBottom: 112,
     gap: 18,
+  },
+  listHeaderContainer: {
+    gap: 18,
+  },
+  listFooterContainer: {
+    gap: 18,
+    marginTop: 4,
+  },
+  searchActiveScreen: {
+    flex: 1,
+  },
+  searchActiveHeader: {
+    flexDirection: 'row-reverse',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+    gap: 10,
+  },
+  searchBackBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  searchBarActiveWrap: {
+    flex: 1,
+  },
+  searchBarActiveInput: {
+    marginBottom: 0,
+  },
+  searchResultsWrap: {
+    flex: 1,
   },
   banner: {
     height: 200,

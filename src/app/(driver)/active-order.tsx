@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useColors } from '@/shared/ui/hooks/useColors';
 import {
@@ -41,6 +41,8 @@ export default function ActiveOrderScreen() {
   const {
     activeOrder,
     isLoading,
+    isRefetching,
+    refetch,
     error,
     advanceStatus,
     isAdvancing,
@@ -49,8 +51,18 @@ export default function ActiveOrderScreen() {
     isReleasing,
   } = useActiveOrder();
   const [releaseModalVisible, setReleaseModalVisible] = useState(false);
-  const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
+  const router = useAppRouter();
   const colors = useColors();
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
   const queryClient = useQueryClient();
   const lastActiveRef = useRef<Order | null>(null);
   const notifiedOrderIds = useRef(new Set<string>());
@@ -84,7 +96,7 @@ export default function ActiveOrderScreen() {
   }, [activeOrder, queryClient]);
 
   const handleAdvance = async () => {
-    if (!activeOrder) return;
+    if (!activeOrder || isAdvancing) return;
     try {
       const result = await advanceStatus(activeOrder.id);
       if (advanceFailedWith(result, 'ORDER_STATUS_CHANGED')) {
@@ -143,7 +155,11 @@ export default function ActiveOrderScreen() {
     return (
       <AppScreen>
         <BrandHeader title="طلباتي النشطة" subtitle="توصيلاتك الحالية" />
-        <View style={styles.centerContainer}>
+        <PageScroll
+          contentStyle={[styles.centerContainer, { flexGrow: 1, paddingBottom: 60 }]}
+          refreshing={refreshing || isRefetching}
+          onRefresh={() => void handleRefresh()}
+        >
           <EmptyState
             icon="bicycle"
             title="لا توجد توصيلات نشطة"
@@ -156,7 +172,7 @@ export default function ActiveOrderScreen() {
               />
             }
           />
-        </View>
+        </PageScroll>
       </AppScreen>
     );
   }
@@ -167,7 +183,10 @@ export default function ActiveOrderScreen() {
         title="طلباتي النشطة"
         subtitle={`طلب ${activeOrder.storeName}`}
       />
-      <PageScroll>
+      <PageScroll
+        refreshing={refreshing || isRefetching}
+        onRefresh={() => void handleRefresh()}
+      >
         <ActiveOrderCard
           order={activeOrder}
           nextStepLabel={NEXT_STEP_LABELS[activeOrder.status] ?? null}

@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View } from 'react-native';
-import { Stack } from 'expo-router';
+import { useColorScheme, View } from 'react-native';
+import { Stack, ThemeProvider as NavigationThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as ExpoNotifications from 'expo-notifications';
+import * as SystemUI from 'expo-system-ui';
 import {
   useFonts,
   Tajawal_400Regular,
@@ -13,6 +14,10 @@ import { AppProviders } from '@/providers/AppProviders';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useNotificationSetup } from '@/features/notifications/application/hooks/useNotificationSetup';
 import { AppSplashScreen } from '@/shared/ui/components';
+import { screenTransitions } from '@/shared/ui/motion';
+
+// Prevent white flash during native transition: set native root window background immediately
+SystemUI.setBackgroundColorAsync('#1A1915').catch(() => {});
 
 // Keep the native splash screen until the JS bundle mounts
 SplashScreen.preventAutoHideAsync().catch(() => {});
@@ -80,15 +85,76 @@ function RootNavigator() {
   // Dismiss splash when prerequisites are satisfied AND minimum 1.5s time has elapsed
   const canDismissSplash = isAppReady && minTimeElapsed;
 
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === 'dark';
+  const baseBg = isDark ? '#1A1915' : '#F8F9FA';
+
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(baseBg).catch(() => {});
+  }, [baseBg]);
+
+  const navTheme = {
+    ...(isDark ? DarkTheme : DefaultTheme),
+    colors: {
+      ...(isDark ? DarkTheme.colors : DefaultTheme.colors),
+      background: baseBg,
+      card: isDark ? '#24231F' : '#FFFFFF',
+      border: isDark ? '#38362F' : '#DEE2E6',
+      primary: '#F5BD16',
+      text: isDark ? '#F6F4EE' : '#191816',
+    },
+  };
+
   return (
-    <View style={{ flex: 1, backgroundColor: '#1A1915' }}>
+    <View style={{ flex: 1, backgroundColor: baseBg }}>
       {/* Root stack mounts underneath once ready */}
       {isAppReady ? (
-        <Stack screenOptions={{ headerShown: false }}>
-          <Stack.Screen name="(auth)" />
-          <Stack.Screen name="(customer)" />
-          <Stack.Screen name="(driver)" />
-        </Stack>
+        <NavigationThemeProvider value={navTheme}>
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              animation: 'fade',
+              contentStyle: { backgroundColor: baseBg },
+            }}
+          >
+            <Stack.Screen name="index" options={{ animation: 'none' }} />
+            <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
+            <Stack.Screen name="(customer)" options={{ animation: 'fade' }} />
+            <Stack.Screen name="(driver)" options={{ animation: 'fade' }} />
+            <Stack.Screen
+              name="store/[id]"
+              options={{
+                ...screenTransitions.horizontal,
+                headerShown: false,
+                contentStyle: { backgroundColor: baseBg },
+              }}
+            />
+            <Stack.Screen
+              name="product/[id]"
+              options={{
+                ...screenTransitions.horizontal,
+                headerShown: false,
+                contentStyle: { backgroundColor: baseBg },
+              }}
+            />
+            <Stack.Screen
+              name="checkout"
+              options={{
+                ...screenTransitions.horizontal,
+                headerShown: false,
+                contentStyle: { backgroundColor: baseBg },
+              }}
+            />
+            <Stack.Screen
+              name="addresses"
+              options={{
+                ...screenTransitions.horizontal,
+                headerShown: false,
+                contentStyle: { backgroundColor: baseBg },
+              }}
+            />
+          </Stack>
+        </NavigationThemeProvider>
       ) : null}
 
       {/* Animated Splash Screen overlays on top and fades out smoothly */}

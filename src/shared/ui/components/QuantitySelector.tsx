@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useTheme } from '../context/ThemeContext';
@@ -20,14 +20,14 @@ interface QuantitySelectorProps {
  * `useQuantityTick` recipe and the steppers press via `usePressAnimation`;
  * props/API are unchanged.
  */
-export function QuantitySelector({
+export const QuantitySelector = React.memo(function QuantitySelector({
   quantity,
   onChange,
   min = 1,
   max = 99,
 }: QuantitySelectorProps) {
   const { theme } = useTheme();
-  const styles = createStyles(theme);
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const atMin = quantity <= min;
   const atMax = quantity >= max;
 
@@ -69,7 +69,7 @@ export function QuantitySelector({
       </AnimatedTouchableOpacity>
     </View>
   );
-}
+});
 
 const AnimatedTouchableOpacity = Animated.createAnimatedComponent(TouchableOpacity);
 

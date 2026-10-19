@@ -1,5 +1,6 @@
+import { useContext } from 'react';
 import { useColorScheme } from 'react-native';
-import { useTheme } from '../context/ThemeContext';
+import { ThemeContext } from '../context/ThemeContext';
 import { lightColors, darkColors, ColorTokens } from '../theme/colors';
 
 /**
@@ -7,11 +8,11 @@ import { lightColors, darkColors, ColorTokens } from '../theme/colors';
  * Seamlessly resolves from active ThemeContext, with safe fallback to system scheme.
  */
 export function useColors(): ColorTokens {
-  try {
-    const { theme } = useTheme();
-    return theme.colors;
-  } catch {
-    const scheme = useColorScheme();
-    return scheme === 'dark' ? darkColors : lightColors;
+  const context = useContext(ThemeContext);
+  const scheme = useColorScheme();
+
+  if (context?.theme?.colors) {
+    return context.theme.colors;
   }
+  return scheme === 'dark' ? darkColors : lightColors;
 }

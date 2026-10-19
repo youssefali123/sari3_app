@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -99,8 +100,14 @@ function mapIconName(name: string): string {
       return name;
   }
 }
-
-export function AppScreen({ children }: { children: ReactNode }) {
+// export function AppScreen({ children }: { children: ReactNode }) {
+export function AppScreen({
+  children,
+}: {
+  children: ReactNode;
+  enableSwipeBack?: boolean;
+  onSwipeBack?: () => void;
+}) {
   const colors = useColors();
   return (
     <SafeAreaView
@@ -121,15 +128,36 @@ export function AppScreen({ children }: { children: ReactNode }) {
 export function PageScroll({
   children,
   contentStyle,
+  refreshControl,
+  onRefresh,
+  refreshing = false,
 }: {
   children: ReactNode;
   contentStyle?: object;
+  refreshControl?: React.ReactElement;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
+  const colors = useColors();
+  const rc =
+    refreshControl ??
+    (onRefresh ? (
+      <RefreshControl
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        tintColor={colors.primary}
+        colors={[colors.primary]}
+        progressBackgroundColor={colors.card}
+      />
+    ) : undefined);
+
   return (
     <ScrollView
+      style={styles.pageScroll}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       contentContainerStyle={[styles.pageContent, contentStyle]}
+      refreshControl={rc}
     >
       {children}
     </ScrollView>
@@ -182,6 +210,15 @@ export function BrandHeader({
 
       {/* Middle Copy */}
       <View style={[styles.headerCopy, !onBack && !leading && { paddingRight: 4 }]}>
+        <Text
+          style={[
+            styles.headerTitle,
+            { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
+          ]}
+          numberOfLines={1}
+        >
+          {title}
+        </Text>
         {subtitle ? (
           <Text
             style={[
@@ -193,15 +230,6 @@ export function BrandHeader({
             {subtitle}
           </Text>
         ) : null}
-        <Text
-          style={[
-            styles.headerTitle,
-            { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
-          ]}
-          numberOfLines={1}
-        >
-          {title}
-        </Text>
       </View>
 
       {/* End side (Left in RTL) */}
@@ -507,10 +535,12 @@ export function ProfileRow({
 
 const styles = StyleSheet.create({
   safe: { flex: 1 },
-  pageContent: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 112, gap: 18 },
+  pageScroll: { flex: 1 },
+  pageContent: { paddingHorizontal: 18, paddingTop: 8, paddingBottom: 136, gap: 18 },
   brandHeader: {
-    minHeight: 64,
+    minHeight: 56,
     paddingHorizontal: 18,
+    paddingVertical: 6,
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
@@ -527,8 +557,8 @@ const styles = StyleSheet.create({
     height: 42,
   },
   headerCopy: { flex: 1, minWidth: 0, alignItems: 'flex-end', justifyContent: 'center' },
-  headerSubtitle: { fontSize: 12, marginBottom: 2, textAlign: 'right' },
-  headerTitle: { fontSize: 19, fontWeight: '700', textAlign: 'right' },
+  headerTitle: { fontSize: 18, fontWeight: '700', textAlign: 'right' },
+  headerSubtitle: { fontSize: 12, marginTop: 2, textAlign: 'right' },
   headerTrailing: {
     flexShrink: 0,
     justifyContent: 'center',

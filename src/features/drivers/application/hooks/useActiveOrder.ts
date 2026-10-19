@@ -104,6 +104,8 @@ export function useActiveOrder() {
   return {
     activeOrder: activeOrderQuery.data ?? null,
     isLoading: activeOrderQuery.isLoading,
+    isRefetching: activeOrderQuery.isRefetching,
+    refetch: () => activeOrderQuery.refetch(),
     error: activeOrderQuery.error ?? advanceMutation.error ?? releaseMutation.error,
     advanceStatus: (targetOrderId: string) =>
       advanceMutation.mutateAsync(targetOrderId),

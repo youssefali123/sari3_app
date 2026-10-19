@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
-  Image,
+  Platform,
   Pressable,
   ScrollView,
   Share,
@@ -8,7 +8,10 @@ import {
   Text,
   View,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Image } from 'expo-image';
+import { useLocalSearchParams } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useQuery } from '@tanstack/react-query';
 
 import { ProductRepository } from '@/features/products/domain/repositories/ProductRepository';
@@ -27,8 +30,6 @@ import {
   AppScreen,
   BrandHeader,
   EmptyState,
-  ErrorState,
-  LoadingState,
   PrimaryButton,
   SectionTitle,
   Surface,
@@ -42,7 +43,8 @@ const storeRepository: StoreRepository = new SupabaseStoreRepository();
 export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const productId = id as string;
-  const router = useRouter();
+  const router = useAppRouter();
+  const insets = useSafeAreaInsets();
   const colors = useColors();
   const { theme } = useTheme();
   const { addItemWithConflictCheck } = useAddToCart();
@@ -56,7 +58,6 @@ export default function ProductDetailScreen() {
     data: product,
     isLoading: productLoading,
     isError,
-    refetch,
   } = useQuery({
     queryKey: ['product', productId],
     queryFn: async () => {
@@ -126,7 +127,7 @@ export default function ProductDetailScreen() {
     if (!product) return;
     Share.share({
       message: `${product.name} — ${formatCurrency(product.price)} على سريع!`,
-    }).catch(() => {});
+    }).catch(() => { });
   };
 
   const handleAddToCart = async () => {
@@ -205,18 +206,27 @@ export default function ProductDetailScreen() {
   return (
     <AppScreen>
       <BrandHeader
-        title={store?.name ?? 'تفاصيل المنتج'}
-        subtitle={product.name}
+        title={product.name}
+        subtitle={store?.name ? `من ${store.name}` : undefined}
         onBack={() => router.back()}
         trailing={
           <View style={styles.headerActions}>
-            <View style={styles.favBtnWrap}>
-              <FavoriteButton kind="product" targetId={product.id} activeColor={colors.primary} />
+            <View
+              style={[
+                styles.favBtnWrap,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.border,
+                },
+              ]}
+            >
+              <FavoriteButton kind="product" targetId={product.id} />
             </View>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="مشاركة المنتج"
               onPress={handleShare}
+              unstable_pressDelay={0}
               hitSlop={8}
               style={({ pressed }) => [
                 styles.shareBtn,
@@ -235,13 +245,20 @@ export default function ProductDetailScreen() {
       />
 
       <ScrollView
+        style={styles.container}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.contentContainer}
         keyboardShouldPersistTaps="handled"
       >
         {/* Product Hero Image */}
         {product.imageUrl ? (
-          <Image source={{ uri: product.imageUrl }} style={styles.heroImage} />
+          <Image
+            source={{ uri: product.imageUrl }}
+            style={styles.heroImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={150}
+          />
         ) : (
           <View style={[styles.heroImage, styles.heroPlaceholder, { backgroundColor: colors.muted }]}>
             <Icon name="Utensils" size={54} color={colors.mutedForeground} />
@@ -290,6 +307,7 @@ export default function ProductDetailScreen() {
                   <Pressable
                     key={variant.id}
                     onPress={() => setSelectedVariantId(variant.id)}
+                    unstable_pressDelay={0}
                     style={({ pressed }) => [
                       styles.optionRow,
                       { borderBottomColor: colors.border, opacity: pressed ? 0.75 : 1 },
@@ -315,12 +333,19 @@ export default function ProductDetailScreen() {
                             fontWeight: isSelected ? '700' : '500',
                           },
                         ]}
+                        numberOfLines={1}
                       >
                         {variant.name}
                       </Text>
                     </View>
-                    <Text style={[styles.optionPrice, { color: colors.foreground }]}>
-                      {formatCurrency(variant.price)}
+                    <Text
+                      style={[
+                        styles.optionPrice,
+                        { color: colors.foreground, writingDirection: 'ltr' },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {formatCurrency(variant.price ?? 0)}
                     </Text>
                   </Pressable>
                 );
@@ -344,6 +369,7 @@ export default function ProductDetailScreen() {
                         isChecked ? prev.filter((id) => id !== addOn.id) : [...prev, addOn.id],
                       );
                     }}
+                    unstable_pressDelay={0}
                     style={({ pressed }) => [
                       styles.optionRow,
                       { borderBottomColor: colors.border, opacity: pressed ? 0.75 : 1 },
@@ -371,12 +397,19 @@ export default function ProductDetailScreen() {
                             fontWeight: isChecked ? '700' : '500',
                           },
                         ]}
+                        numberOfLines={1}
                       >
                         {addOn.name}
                       </Text>
                     </View>
-                    <Text style={[styles.optionPrice, { color: colors.mutedForeground }]}>
-                      + {formatCurrency(addOn.price)}
+                    <Text
+                      style={[
+                        styles.optionPrice,
+                        { color: colors.mutedForeground, writingDirection: 'ltr' },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {`+ ${formatCurrency(addOn.price ?? 0)}`}
                     </Text>
                   </Pressable>
                 );
@@ -391,6 +424,7 @@ export default function ProductDetailScreen() {
           <View style={styles.quantityControls}>
             <Pressable
               onPress={() => setQuantity((q) => Math.max(1, q - 1))}
+              unstable_pressDelay={0}
               disabled={quantity <= 1}
               hitSlop={8}
               style={({ pressed }) => [
@@ -412,6 +446,7 @@ export default function ProductDetailScreen() {
 
             <Pressable
               onPress={() => setQuantity((q) => q + 1)}
+              unstable_pressDelay={0}
               hitSlop={8}
               style={({ pressed }) => [
                 styles.stepBtn,
@@ -428,23 +463,33 @@ export default function ProductDetailScreen() {
           </View>
         </Surface>
 
-        {/* Add to Cart CTA */}
-        <View style={styles.ctaWrapper}>
-          <PrimaryButton
-            title={
-              unavailable
-                ? 'المنتج غير متاح حالياً'
-                : !storeIsOpen
+      </ScrollView>
+
+      {/* Sticky Bottom CTA */}
+      <View
+        style={[
+          styles.ctaWrapper,
+          {
+            backgroundColor: colors.card,
+            borderTopColor: colors.border,
+            paddingBottom: Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 16) + 8,
+          },
+        ]}
+      >
+        <PrimaryButton
+          title={
+            unavailable
+              ? 'المنتج غير متاح حالياً'
+              : !storeIsOpen
                 ? 'المتجر مغلق حالياً'
                 : `أضف إلى السلة · ${formatCurrency(totalPrice)}`
-            }
-            icon="bag"
-            disabled={unavailable || !storeIsOpen}
-            loading={isAdding}
-            onPress={() => void handleAddToCart()}
-          />
-        </View>
-      </ScrollView>
+          }
+          icon="bag"
+          disabled={unavailable || !storeIsOpen}
+          loading={isAdding}
+          onPress={() => void handleAddToCart()}
+        />
+      </View>
 
       {/* Cross-store conflict modal */}
       <StoreConflictModal />
@@ -453,6 +498,9 @@ export default function ProductDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   centerContainer: {
     flex: 1,
     paddingHorizontal: 18,
@@ -461,7 +509,7 @@ const styles = StyleSheet.create({
   contentContainer: {
     paddingHorizontal: 18,
     paddingTop: 8,
-    paddingBottom: 40,
+    paddingBottom: 24,
     gap: 16,
   },
   headerActions: {
@@ -472,6 +520,8 @@ const styles = StyleSheet.create({
   favBtnWrap: {
     width: 38,
     height: 38,
+    borderRadius: 13,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -540,11 +590,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: 12,
   },
   optionCheckRow: {
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 12,
+    flex: 1,
+    minWidth: 0,
   },
   radioCircle: {
     width: 22,
@@ -570,10 +623,13 @@ const styles = StyleSheet.create({
   },
   optionName: {
     fontSize: 14,
+    flexShrink: 1,
+    textAlign: 'right',
   },
   optionPrice: {
     fontSize: 13,
     fontWeight: '600',
+    flexShrink: 0,
   },
   quantityCard: {
     flexDirection: 'row-reverse',
@@ -606,7 +662,8 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   ctaWrapper: {
-    marginTop: 6,
-    marginBottom: 20,
+    paddingHorizontal: 18,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
 });

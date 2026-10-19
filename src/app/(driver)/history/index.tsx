@@ -1,6 +1,8 @@
-import React from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import React, { useState } from 'react';
+import { FlatList, Platform, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
+import { useColors } from '@/shared/ui/hooks/useColors';
 import {
   AppScreen,
   BrandHeader,
@@ -17,8 +19,30 @@ import { DeliveryHistoryEntry } from '@/features/drivers/domain/entities/Deliver
  * Upgraded to SOURCE design language with AppScreen, BrandHeader, and EmptyState.
  */
 export default function DriverHistoryScreen() {
-  const router = useRouter();
-  const { data, isLoading, error, refetch } = useDriverHistory();
+  const insets = useSafeAreaInsets();
+  const router = useAppRouter();
+  const colors = useColors();
+  const { data, isLoading, isRefetching, error, refetch } = useDriverHistory();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await refetch();
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const refreshControl = (
+    <RefreshControl
+      refreshing={refreshing || isRefetching}
+      onRefresh={() => void handleRefresh()}
+      tintColor={colors.primary}
+      colors={[colors.primary]}
+      progressBackgroundColor={colors.card}
+    />
+  );
 
   const entries = data ?? [];
 
@@ -37,19 +61,38 @@ export default function DriverHistoryScreen() {
           />
         </View>
       ) : entries.length === 0 ? (
-        <View style={styles.centerContainer}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={[
+            styles.centerContainer,
+            {
+              flexGrow: 1,
+              paddingBottom:
+                Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 16) + 80,
+            },
+          ]}
+          refreshControl={refreshControl}
+          showsVerticalScrollIndicator={false}
+        >
           <EmptyState
             icon="receipt-outline"
             title="لا توجد طلبات سابقة"
             message="ستجد هنا سجل توصيلاتك والرحلات التي قمت بها فور إتمام أول طلب."
           />
-        </View>
+        </ScrollView>
       ) : (
         <FlatList
           style={styles.container}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            {
+              paddingBottom:
+                Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 16) + 80,
+            },
+          ]}
           data={entries}
           keyExtractor={(item) => item.id}
+          refreshControl={refreshControl}
           renderItem={({ item }: { item: DeliveryHistoryEntry }) => (
             <DeliveryHistoryCard
               entry={item}

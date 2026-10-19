@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import Animated from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, useTheme } from '@/shared/ui/theme';
 import { Icon } from '@/shared/ui/components/Icon';
 import { PrimaryButton } from '@/shared/ui/components/AppUI';
@@ -37,6 +38,7 @@ export function OrderReleaseModal({
   const [reason, setReason] = useState('');
   const colors = useColors();
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const animatedKeyboardStyle = useSmoothKeyboardElevation();
 
   const trimmed = reason.trim();
@@ -76,6 +78,8 @@ export function OrderReleaseModal({
             {
               backgroundColor: colors.card,
               borderColor: colors.border,
+              paddingBottom:
+                Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 16) + 12,
             },
             animatedKeyboardStyle,
           ]}
@@ -187,6 +191,7 @@ export function OrderReleaseModal({
 
             <Pressable
               onPress={handleClose}
+              unstable_pressDelay={0}
               disabled={isSubmitting}
               style={({ pressed }) => [
                 styles.cancelButton,
@@ -227,7 +232,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
     gap: 12,
   },
   handle: {

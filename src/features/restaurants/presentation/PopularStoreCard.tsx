@@ -1,9 +1,8 @@
-import React from 'react';
-import { Image, StyleProp, StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
-import Animated from 'react-native-reanimated';
+import React, { useMemo } from 'react';
+import { Pressable, StyleProp, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import { Image } from 'expo-image';
 import { Store } from '../domain/entities/Store';
 import { FavoriteButton } from '../../favorites/presentation/FavoriteButton';
-import { cardPress, usePressAnimation } from '@/shared/ui/motion';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
 
 interface PopularStoreCardProps {
@@ -16,14 +15,13 @@ interface PopularStoreCardProps {
 /**
  * Compact store card (feature 010 home rollout / Phase 3 screen design).
  * Image with a favorite-heart scrim and open/closed chip, name + rating,
- * cuisine/category line. Press feedback uses the shared `cardPress` recipe;
+ * cuisine/category line. Fast native Pressable with subtle opacity feedback;
  * the favorite pop comes from `FavoriteButton`. Fixed 170 wide by default
  * (home carousel); pass `style` to reuse it in grids/lists.
  */
-export function PopularStoreCard({ store, onPress, style }: PopularStoreCardProps) {
+export const PopularStoreCard = React.memo(function PopularStoreCard({ store, onPress, style }: PopularStoreCardProps) {
   const { theme } = useTheme();
-  const styles = createStyles(theme);
-  const { onPressIn, onPressOut, animatedStyle } = usePressAnimation(cardPress);
+  const styles = useMemo(() => createStyles(theme), [theme]);
 
   const categoryLine =
     store.description?.trim() ||
@@ -31,60 +29,66 @@ export function PopularStoreCard({ store, onPress, style }: PopularStoreCardProp
     (store.type === 'market' ? 'كل احتياجاتك اليومية' : null);
 
   return (
-    <Animated.View style={[styles.card, animatedStyle, style]}>
-      <TouchableOpacity
-        onPress={onPress}
-        onPressIn={onPressIn}
-        onPressOut={onPressOut}
-        activeOpacity={0.88}
-        accessibilityRole="button"
-        accessibilityLabel={`${store.name}${store.rating !== null ? `، تقييم ${store.rating.toFixed(1)}` : ''}`}
-        style={styles.touchable}
-      >
-        <View style={styles.imageWrap}>
-          {store.imageUrl ? (
-            <Image source={{ uri: store.imageUrl }} style={styles.image} />
-          ) : (
-            <View style={[styles.image, styles.imagePlaceholder]}>
-              <Text style={styles.imagePlaceholderText}>{store.name.charAt(0)}</Text>
-            </View>
-          )}
-          <View style={styles.favoriteScrim} pointerEvents="box-none">
-            <FavoriteButton kind="store" targetId={store.id} overlay />
+    <Pressable
+      onPress={onPress}
+      unstable_pressDelay={0}
+      accessibilityRole="button"
+      accessibilityLabel={`${store.name}${store.rating !== null ? `، تقييم ${store.rating.toFixed(1)}` : ''}`}
+      style={({ pressed }) => [
+        styles.card,
+        style,
+        pressed && styles.cardPressed,
+      ]}
+    >
+      <View style={styles.imageWrap}>
+        {store.imageUrl ? (
+          <Image
+            source={{ uri: store.imageUrl }}
+            style={styles.image}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            transition={null}
+          />
+        ) : (
+          <View style={[styles.image, styles.imagePlaceholder]}>
+            <Text style={styles.imagePlaceholderText}>{store.name.charAt(0)}</Text>
           </View>
-          <View
-            style={[
-              styles.statusChip,
-              store.isOpen ? styles.statusOpen : styles.statusClosed,
-            ]}
-          >
-            <Text style={styles.statusChipText}>
-              {store.isOpen ? 'مفتوح' : 'مغلق'}
-            </Text>
-          </View>
+        )}
+        <View style={styles.favoriteScrim} pointerEvents="box-none">
+          <FavoriteButton kind="store" targetId={store.id} overlay />
         </View>
-        <View style={styles.info}>
-          <View style={styles.titleRow}>
-            <Text style={styles.name} numberOfLines={1}>
-              {store.name}
-            </Text>
-            {store.rating !== null ? (
-              <View style={styles.ratingRow}>
-                <Text style={styles.ratingValue}>{store.rating.toFixed(1)}</Text>
-                <Text style={styles.ratingStar}>★</Text>
-              </View>
-            ) : null}
-          </View>
-          {categoryLine ? (
-            <Text style={styles.category} numberOfLines={1}>
-              {categoryLine}
-            </Text>
+        <View
+          style={[
+            styles.statusChip,
+            store.isOpen ? styles.statusOpen : styles.statusClosed,
+          ]}
+        >
+          <Text style={styles.statusChipText}>
+            {store.isOpen ? 'مفتوح' : 'مغلق'}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.info}>
+        <View style={styles.titleRow}>
+          <Text style={styles.name} numberOfLines={1}>
+            {store.name}
+          </Text>
+          {store.rating !== null ? (
+            <View style={styles.ratingRow}>
+              <Text style={styles.ratingValue}>{store.rating.toFixed(1)}</Text>
+              <Text style={styles.ratingStar}>★</Text>
+            </View>
           ) : null}
         </View>
-      </TouchableOpacity>
-    </Animated.View>
+        {categoryLine ? (
+          <Text style={styles.category} numberOfLines={1}>
+            {categoryLine}
+          </Text>
+        ) : null}
+      </View>
+    </Pressable>
   );
-}
+});
 
 const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
   StyleSheet.create({
@@ -97,8 +101,9 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       borderColor: theme.colors.border,
       ...theme.shadows.low,
     },
-    touchable: {
-      flex: 1,
+    cardPressed: {
+      opacity: 0.88,
+      transform: [{ scale: 0.98 }],
     },
     imageWrap: {
       height: 112,
@@ -120,8 +125,6 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       position: 'absolute',
       top: 8,
       end: 8,
-      backgroundColor: 'rgba(0,0,0,0.3)',
-      borderRadius: theme.radii.pill,
     },
     statusChip: {
       position: 'absolute',

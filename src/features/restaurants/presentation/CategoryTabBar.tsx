@@ -27,6 +27,7 @@ export function CategoryTabBar({ categories, selectedId, onSelect }: CategoryTab
         <TouchableOpacity
           style={[styles.tab, selectedId === null && styles.tabActive]}
           onPress={() => onSelect(null)}
+          delayPressIn={0}
         >
           <Text style={[styles.tabText, selectedId === null && styles.tabTextActive]}>
             All
@@ -37,6 +38,7 @@ export function CategoryTabBar({ categories, selectedId, onSelect }: CategoryTab
             key={category.id}
             style={[styles.tab, selectedId === category.id && styles.tabActive]}
             onPress={() => onSelect(category.id)}
+            delayPressIn={0}
           >
             <Text
               style={[styles.tabText, selectedId === category.id && styles.tabTextActive]}

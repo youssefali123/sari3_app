@@ -1,5 +1,5 @@
-import React from 'react';
-import { Image, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { useTheme } from '../context/ThemeContext';
 
 interface AvatarProps {
@@ -46,7 +46,13 @@ export function Avatar({ size = 'medium', source, initials, accessibilityLabel }
       accessibilityLabel={accessibilityLabel ?? initials}
     >
       {source ? (
-        <Image source={source} style={imageStyle} resizeMode="cover" />
+        <Image
+          source={source}
+          style={imageStyle}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={150}
+        />
       ) : (
         <Text style={initialsStyle}>{initials ?? '?'}</Text>
       )}

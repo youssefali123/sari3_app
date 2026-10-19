@@ -109,6 +109,8 @@ export function useAvailableOrders() {
   return {
     orders: poolQuery.data ?? [],
     isLoading: poolQuery.isLoading,
+    isRefetching: poolQuery.isRefetching,
+    refetch: () => poolQuery.refetch(),
     error: poolQuery.error ?? claimMutation.error ?? declineMutation.error,
     claim: (orderId: string) => claimMutation.mutateAsync(orderId),
     isClaiming: claimMutation.isPending,

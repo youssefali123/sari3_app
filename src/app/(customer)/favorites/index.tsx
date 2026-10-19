@@ -1,8 +1,7 @@
-import React, { useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import React, { useCallback, useMemo, useState } from 'react';
+import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 
 import { FavoritesRepository } from '@/features/favorites/domain/repositories/FavoritesRepository';
 import { SupabaseFavoritesRepository } from '@/features/favorites/infrastructure/SupabaseFavoritesRepository';
@@ -17,7 +16,6 @@ import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { useColors } from '@/shared/ui/hooks/useColors';
-import { useTheme } from '@/shared/ui/context/ThemeContext';
 import {
   AppScreen,
   AuthRequiredView,
@@ -31,8 +29,6 @@ import { Icon } from '@/shared/ui/components/Icon';
 import {
   SkeletonCard,
   SkeletonItem,
-  listEntrance,
-  useEntranceAnimation,
 } from '@/shared/ui/motion';
 
 const favoritesRepository: FavoritesRepository = new SupabaseFavoritesRepository();
@@ -53,11 +49,11 @@ const TABS: { key: FavoritesTab; label: string }[] = [
  */
 export default function FavoritesScreen() {
   useRequireAuth('/(customer)/favorites');
-  const router = useRouter();
+  const router = useAppRouter();
   const colors = useColors();
-  const { theme } = useTheme();
   const { user, isLoading: isAuthLoading } = useAuth();
   const [tab, setTab] = useState<FavoritesTab>('restaurants');
+  const [refreshing, setRefreshing] = useState(false);
   const customerId = useCurrentCustomerId();
   const { selectedAreaId, selectedAreaName } = useSelectedArea();
 
@@ -94,7 +90,7 @@ export default function FavoritesScreen() {
       : scoped.filter((s) => s.type === 'market');
   }, [stores, selectedAreaId, tab]);
 
-  const { data: areaMapStores } = useQuery({
+  const { data: areaMapStores, refetch: refetchAreaMap } = useQuery({
     queryKey: ['stores', 'areaMap'],
     queryFn: () => storeRepository.getStores(),
   });
@@ -109,29 +105,38 @@ export default function FavoritesScreen() {
   const isLoading =
     tab === 'products' ? productsLoading : storesLoading;
   const isError = tab === 'products' ? productsError : storesError;
-  const refetch = tab === 'products' ? refetchProducts : refetchStores;
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([
+        refetchStores(),
+        refetchProducts(),
+        refetchAreaMap(),
+      ]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchStores, refetchProducts, refetchAreaMap]);
 
   const itemCount =
     tab === 'products' ? visibleProducts.length : visibleStores.length;
   const totalSaved =
     (stores?.length ?? 0) + (products?.length ?? 0);
 
-  const renderRow = ({ item, index }: { item: Store | Product; index: number }) => (
-    <ListCell index={index} itemKey={`${'storeId' in item ? 'p' : 's'}-${item.id}`}>
-      {'storeId' in item ? (
-        <ProductCard
-          product={item}
-          storeIsOpen={areaMapStores?.find((s) => s.id === item.storeId)?.isOpen ?? true}
-          onPress={() => router.push(`/product/${item.id}`)}
-        />
-      ) : (
-        <StoreCard
-          store={item}
-          onPress={() => router.push(`/(customer)/(home)/store/${item.id}`)}
-        />
-      )}
-    </ListCell>
-  );
+  const renderRow = ({ item }: { item: Store | Product }) =>
+    'storeId' in item ? (
+      <ProductCard
+        product={item}
+        storeIsOpen={areaMapStores?.find((s) => s.id === item.storeId)?.isOpen ?? true}
+        onPress={() => router.push(`/product/${item.id}`)}
+      />
+    ) : (
+      <StoreCard
+        store={item}
+        onPress={() => router.push(`/store/${item.id}`)}
+      />
+    );
 
   if (!isAuthLoading && !user) {
     return (
@@ -196,51 +201,65 @@ export default function FavoritesScreen() {
                 />
               ))}
         </View>
-      ) : isError ? (
-        <View style={styles.errorContainer}>
-          <ErrorState
-            title="تعذر التحميل"
-            message="حدث خطأ أثناء جلب المفضلة. حاول مرة أخرى."
-            onRetry={() => void refetch()}
-          />
-        </View>
-      ) : itemCount === 0 ? (
-        <View style={styles.emptyContainer}>
-          <EmptyState
-            emoji="💛"
-            title={
-              totalSaved > 0
-                ? `لا يوجد في ${TABS.find((t) => t.key === tab)?.label} داخل ${selectedAreaName ?? 'هذه المنطقة'}`
-                : 'قائمتك المفضلة فارغة'
-            }
-            message={
-              totalSaved > 0
-                ? 'المفضلة من مناطق أخرى محفوظة — غيّر المنطقة لتراها.'
-                : 'اضغط على علامة القلب بجانب أي مطعم أو منتج لحفظه هنا.'
-            }
-            action={
-              <PrimaryButton
-                title={totalSaved > 0 ? 'العودة للرئيسية' : 'تصفح المتاجر'}
-                icon="basket"
-                onPress={() => router.push('/(customer)/(home)' as never)}
-              />
-            }
-          />
-        </View>
       ) : (
         <FlatList
-          data={tab === 'products' ? visibleProducts : visibleStores}
+          style={styles.container}
+          data={isError ? [] : (tab === 'products' ? visibleProducts : visibleStores)}
           keyExtractor={(item) => item.id}
           renderItem={renderRow}
           showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContent}
+          alwaysBounceVertical
+          contentContainerStyle={[
+            styles.listContent,
+            (itemCount === 0 || isError) && styles.emptyListContent,
+          ]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          ListEmptyComponent={
+            isError ? (
+              <ErrorState
+                title="تعذر التحميل"
+                message="حدث خطأ أثناء جلب المفضلة. حاول مرة أخرى."
+                onRetry={() => void onRefresh()}
+              />
+            ) : (
+              <EmptyState
+                emoji="💛"
+                title={
+                  totalSaved > 0
+                    ? `لا يوجد في ${TABS.find((t) => t.key === tab)?.label} داخل ${selectedAreaName ?? 'هذه المنطقة'}`
+                    : 'قائمتك المفضلة فارغة'
+                }
+                message={
+                  totalSaved > 0
+                    ? 'المفضلة من مناطق أخرى محفوظة — غيّر المنطقة لتراها.'
+                    : 'اضغط على علامة القلب بجانب أي مطعم أو منتج لحفظه هنا.'
+                }
+                action={
+                  <PrimaryButton
+                    title={totalSaved > 0 ? 'العودة للرئيسية' : 'تصفح المتاجر'}
+                    icon="basket"
+                    onPress={() => router.push('/(customer)/(home)' as never)}
+                  />
+                }
+              />
+            )
+          }
           ListFooterComponent={
-            <Surface style={styles.tipCard}>
-              <Icon name="Heart" size={18} color={colors.destructive} />
-              <Text style={[styles.tipText, { color: colors.mutedForeground }]}>
-                احفظ مطاعمك ومنتجاتك المفضلة لتجدها بسرعة في المرة القادمة.
-              </Text>
-            </Surface>
+            !isError && itemCount > 0 ? (
+              <Surface style={styles.tipCard}>
+                <Icon name="Heart" size={18} color={colors.destructive} />
+                <Text style={[styles.tipText, { color: colors.mutedForeground }]}>
+                  احفظ مطاعمك ومنتجاتك المفضلة لتجدها بسرعة في المرة القادمة.
+                </Text>
+              </Surface>
+            ) : null
           }
         />
       )}
@@ -248,24 +267,10 @@ export default function FavoritesScreen() {
   );
 }
 
-/** Opt-in entrance for list rows (capped stagger; recycling-safe). */
-function ListCell({
-  index,
-  itemKey,
-  children,
-}: {
-  index: number;
-  itemKey: string;
-  children: React.ReactNode;
-}) {
-  const animatedStyle = useEntranceAnimation(index, {
-    ...listEntrance(),
-    itemKey,
-  });
-  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
-}
-
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   segmentContainer: {
     paddingHorizontal: 18,
     paddingBottom: 8,
@@ -292,16 +297,10 @@ const styles = StyleSheet.create({
     gap: 12,
     paddingBottom: 120,
   },
-  emptyContainer: {
-    flex: 1,
-    paddingHorizontal: 18,
+  emptyListContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingBottom: 80,
-  },
-  errorContainer: {
-    flex: 1,
-    paddingHorizontal: 18,
-    justifyContent: 'center',
   },
   tipCard: {
     flexDirection: 'row-reverse',

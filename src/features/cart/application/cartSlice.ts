@@ -1,4 +1,4 @@
-import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { createSelector, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { CartItem } from '../domain/entities/CartItem';
 import { generateCartItemId } from '../domain/cartUtils';
 
@@ -196,14 +196,19 @@ export const selectCartStoreId = (state: { cart: CartState }) => state.cart.stor
 export const selectCartStoreName = (state: { cart: CartState }) =>
   state.cart.storeName;
 
-export const selectCartItemCount = (state: { cart: CartState }) =>
-  state.cart.items.reduce((count, item) => count + item.quantity, 0);
+export const selectCartItemCount = createSelector(
+  [selectCartItems],
+  (items) => items.reduce((count, item) => count + item.quantity, 0),
+);
 
-export const selectCartSubtotal = (state: { cart: CartState }) =>
-  state.cart.items.reduce((total, item) => {
-    const addonsTotal = item.selectedAddOns.reduce((acc, a) => acc + a.unitPrice, 0);
-    return total + (item.baseUnitPrice + addonsTotal) * item.quantity;
-  }, 0);
+export const selectCartSubtotal = createSelector(
+  [selectCartItems],
+  (items) =>
+    items.reduce((total, item) => {
+      const addonsTotal = item.selectedAddOns.reduce((acc, a) => acc + a.unitPrice, 0);
+      return total + (item.baseUnitPrice + addonsTotal) * item.quantity;
+    }, 0),
+);
 
 export const selectCartConflict = (state: { cart: CartState }) =>
   state.cart.conflictState;

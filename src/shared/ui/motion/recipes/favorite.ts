@@ -33,20 +33,34 @@ export interface FavoriteToggleAnimation {
  */
 export function useFavoriteToggleAnimation(
   isFavorite: boolean,
-  options: { haptic?: boolean } = {},
+  options: { haptic?: boolean; enabled?: boolean } = {},
 ): FavoriteToggleAnimation {
-  const { haptic = true } = options;
+  const { haptic = true, enabled = true } = options;
   const reducedMotion = useReducedMotion();
   const scale = useSharedValue(1);
-  const firstRender = useRef(true);
+  const prevFavorite = useRef(isFavorite);
+  const isFirstMount = useRef(true);
 
   useEffect(() => {
-    // The initial favorite state is a display fact, not a toggle event —
-    // pop + haptic only on confirmed CHANGES (FR-010 reacts to states).
-    if (firstRender.current) {
-      firstRender.current = false;
+    // Initial mount is purely a display state, not a user toggle event
+    if (isFirstMount.current) {
+      isFirstMount.current = false;
+      prevFavorite.current = isFavorite;
       return;
     }
+
+    // When not enabled (e.g. initial query fetch / cache hydration), sync value without animating or vibrating
+    if (!enabled) {
+      prevFavorite.current = isFavorite;
+      return;
+    }
+
+    // Only animate on actual state changes
+    if (prevFavorite.current === isFavorite) {
+      return;
+    }
+    prevFavorite.current = isFavorite;
+
     const { duration, easing } = presets.fastInteraction(reducedMotion);
     if (isFavorite) {
       scale.value = withSequence(
@@ -62,7 +76,7 @@ export function useFavoriteToggleAnimation(
     if (haptic) fireHaptic('favorite', reducedMotion);
     return () => cancelAnimation(scale);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFavorite]);
+  }, [isFavorite, enabled]);
 
   const iconStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],

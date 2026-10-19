@@ -25,7 +25,10 @@ interface DeliveryHistoryCardProps {
  * One delivery-history row.
  * Upgraded to Sari3 design language with Surface card, RTL layout, color-coded status badges, and Tajawal typography.
  */
-export function DeliveryHistoryCard({ entry, onOpen }: DeliveryHistoryCardProps) {
+export const DeliveryHistoryCard = React.memo(function DeliveryHistoryCard({
+  entry,
+  onOpen,
+}: DeliveryHistoryCardProps) {
   const colors = useColors();
   const { theme } = useTheme();
 
@@ -52,6 +55,7 @@ export function DeliveryHistoryCard({ entry, onOpen }: DeliveryHistoryCardProps)
   return (
     <Pressable
       onPress={onOpen}
+      unstable_pressDelay={0}
       style={({ pressed }) => [
         { opacity: pressed ? 0.9 : 1, transform: [{ scale: pressed ? 0.985 : 1 }] },
       ]}
@@ -130,7 +134,7 @@ export function DeliveryHistoryCard({ entry, onOpen }: DeliveryHistoryCardProps)
       </Surface>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   card: {

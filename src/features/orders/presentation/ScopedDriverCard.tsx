@@ -1,5 +1,5 @@
-import React from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
+import { Image } from 'expo-image';
 import { OrderStatus } from '../domain/entities/OrderStatus';
 import { OrderDriverInfo } from '../domain/entities/OrderDriverInfo';
 import { colors } from '@/shared/ui/theme/colors';
@@ -31,7 +31,13 @@ export function ScopedDriverCard({ status, driverInfo }: ScopedDriverCardProps) 
   return (
     <View style={styles.card}>
       {driverInfo.driverPhotoUrl ? (
-        <Image source={{ uri: driverInfo.driverPhotoUrl }} style={styles.photo} />
+        <Image
+          source={{ uri: driverInfo.driverPhotoUrl }}
+          style={styles.photo}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          transition={150}
+        />
       ) : (
         <View style={[styles.photo, styles.photoPlaceholder]}>
           <Text style={styles.photoPlaceholderText}>

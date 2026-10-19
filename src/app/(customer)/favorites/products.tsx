@@ -1,7 +1,7 @@
-import React, { useMemo } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import React, { useCallback, useMemo, useState } from 'react';
+import { FlatList, RefreshControl, StyleSheet, View } from 'react-native';
 import { useQuery } from '@tanstack/react-query';
-import { useRouter } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { FavoritesRepository } from '@/features/favorites/domain/repositories/FavoritesRepository';
 import { SupabaseFavoritesRepository } from '@/features/favorites/infrastructure/SupabaseFavoritesRepository';
 import { ProductCard } from '@/features/products/presentation/ProductCard';
@@ -10,12 +10,12 @@ import { SupabaseStoreRepository } from '@/features/restaurants/infrastructure/S
 import { useSelectedArea } from '@/features/areas/application/hooks/useSelectedArea';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
+import { useColors } from '@/shared/ui/hooks/useColors';
 import {
   AppScreen,
   BrandHeader,
   EmptyState,
   ErrorState,
-  LoadingState,
   PrimaryButton,
   AuthRequiredView,
 } from '@/shared/ui/components';
@@ -27,8 +27,10 @@ const storeRepository: StoreRepository = new SupabaseStoreRepository();
 
 export default function FavoriteProductsScreen() {
   useRequireAuth('/(customer)/favorites/products');
-  const router = useRouter();
+  const router = useAppRouter();
+  const colors = useColors();
   const { user, isLoading: isAuthLoading } = useAuth();
+  const [refreshing, setRefreshing] = useState(false);
   const customerId = useCurrentCustomerId();
   const { selectedAreaId, selectedAreaName } = useSelectedArea();
 
@@ -36,7 +38,7 @@ export default function FavoriteProductsScreen() {
     data: products,
     isLoading,
     isError,
-    refetch,
+    refetch: refetchProducts,
   } = useQuery({
     queryKey: ['favoriteProducts', customerId],
     queryFn: () => favoritesRepository.getFavoriteProducts(customerId!),
@@ -44,10 +46,19 @@ export default function FavoriteProductsScreen() {
   });
 
   // Feature 006: products are scoped by their STORE's area.
-  const { data: stores } = useQuery({
+  const { data: stores, refetch: refetchStores } = useQuery({
     queryKey: ['stores', 'areaMap'],
     queryFn: () => storeRepository.getStores(),
   });
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([refetchProducts(), refetchStores()]);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [refetchProducts, refetchStores]);
 
   const visibleProducts = useMemo(() => {
     if (!products) return [];
@@ -88,40 +99,10 @@ export default function FavoriteProductsScreen() {
             <SkeletonItem key={idx} />
           ))}
         </View>
-      ) : isError ? (
-        <View style={styles.centerContainer}>
-          <ErrorState
-            title="تعذر التحميل"
-            message="حدث خطأ أثناء جلب المنتجات المفضلة."
-            onRetry={() => void refetch()}
-          />
-        </View>
-      ) : visibleProducts.length === 0 ? (
-        <View style={styles.centerContainer}>
-          <EmptyState
-            emoji="🛍️"
-            title={
-              (products?.length ?? 0) > 0
-                ? `لا توجد منتجات مفضلة في ${selectedAreaName ?? 'هذه المنطقة'}`
-                : 'لا توجد منتجات مفضلة بعد'
-            }
-            message={
-              (products?.length ?? 0) > 0
-                ? 'المفضلة من مناطق أخرى محفوظة — غيّر المنطقة لتراها.'
-                : 'اضغط على القلب بجانب أي منتج لحفظه هنا.'
-            }
-            action={
-              <PrimaryButton
-                title="تصفح المنتجات"
-                icon="basket"
-                onPress={() => router.push('/(customer)/(home)' as never)}
-              />
-            }
-          />
-        </View>
       ) : (
         <FlatList
-          data={visibleProducts}
+          style={styles.container}
+          data={isError ? [] : visibleProducts}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <ProductCard
@@ -130,7 +111,50 @@ export default function FavoriteProductsScreen() {
               onPress={() => router.push(`/product/${item.id}`)}
             />
           )}
-          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          alwaysBounceVertical
+          contentContainerStyle={[
+            styles.listContent,
+            (visibleProducts.length === 0 || isError) && styles.emptyListContent,
+          ]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.primary}
+              colors={[colors.primary]}
+            />
+          }
+          ListEmptyComponent={
+            isError ? (
+              <ErrorState
+                title="تعذر التحميل"
+                message="حدث خطأ أثناء جلب المنتجات المفضلة."
+                onRetry={() => void onRefresh()}
+              />
+            ) : (
+              <EmptyState
+                emoji="🛍️"
+                title={
+                  (products?.length ?? 0) > 0
+                    ? `لا توجد منتجات مفضلة في ${selectedAreaName ?? 'هذه المنطقة'}`
+                    : 'لا توجد منتجات مفضلة بعد'
+                }
+                message={
+                  (products?.length ?? 0) > 0
+                    ? 'المفضلة من مناطق أخرى محفوظة — غيّر المنطقة لتراها.'
+                    : 'اضغط على القلب بجانب أي منتج لحفظه هنا.'
+                }
+                action={
+                  <PrimaryButton
+                    title="تصفح المنتجات"
+                    icon="basket"
+                    onPress={() => router.push('/(customer)/(home)' as never)}
+                  />
+                }
+              />
+            )
+          }
         />
       )}
     </AppScreen>
@@ -138,15 +162,17 @@ export default function FavoriteProductsScreen() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   listContent: {
     paddingHorizontal: 18,
     paddingTop: 8,
     gap: 12,
     paddingBottom: 120,
   },
-  centerContainer: {
-    flex: 1,
-    paddingHorizontal: 18,
+  emptyListContent: {
+    flexGrow: 1,
     justifyContent: 'center',
     paddingBottom: 80,
   },

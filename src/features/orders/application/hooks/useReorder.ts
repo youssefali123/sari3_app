@@ -134,7 +134,7 @@ export function useReorder() {
         }
 
         dispatch(clearAndSetBatch(batch));
-        router.push('/(customer)/checkout');
+        router.push('/checkout');
       } catch (error) {
         showAlert(
           'Could not reorder',

@@ -2,11 +2,15 @@ import React, { useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Platform,
+  RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { useColors } from '@/shared/ui/hooks/useColors';
 import {
   AppScreen,
@@ -32,15 +36,18 @@ const NOT_AVAILABLE_MESSAGE = 'تم قبول هذا الطلب من قبل سا�
  * Upgraded to SOURCE DriverScreens design language while keeping all business logic.
  */
 export default function AvailableOrdersScreen() {
-  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const router = useAppRouter();
   const colors = useColors();
   const { isAvailable, isLoading: availabilityLoading } =
     useDriverAvailability();
-  const { hasAssignedAreas } = useDriverAreas();
+  const { hasAssignedAreas, refetch: refetchAreas } = useDriverAreas();
   const { activeOrder, isLoading: activeOrderLoading } = useActiveOrder();
   const {
     orders,
     isLoading: poolLoading,
+    isRefetching: poolRefetching,
+    refetch,
     error,
     claim,
     isClaiming,
@@ -48,12 +55,33 @@ export default function AvailableOrdersScreen() {
     decliningOrderId,
   } = useAvailableOrders();
   const [lostRaceOrderId, setLostRaceOrderId] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([refetch(), refetchAreas?.()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const refreshControl = (
+    <RefreshControl
+      refreshing={refreshing || poolRefetching}
+      onRefresh={() => void handleRefresh()}
+      tintColor={colors.primary}
+      colors={[colors.primary]}
+      progressBackgroundColor={colors.card}
+    />
+  );
 
   const handleOpen = (orderId: string) => {
     router.push(`/(driver)/available-orders/${orderId}`);
   };
 
   const handleQuickClaim = async (orderId: string) => {
+    if (isClaiming) return;
     try {
       const result = await claim(orderId);
       if (result.claimed) {
@@ -127,19 +155,38 @@ export default function AvailableOrdersScreen() {
       ) : poolLoading ? (
         <LoadingState />
       ) : orders.length === 0 ? (
-        <View style={styles.centerContainer}>
+        <ScrollView
+          style={styles.pool}
+          contentContainerStyle={[
+            styles.centerContainer,
+            {
+              flexGrow: 1,
+              paddingBottom:
+                Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 16) + 80,
+            },
+          ]}
+          refreshControl={refreshControl}
+          showsVerticalScrollIndicator={false}
+        >
           <EmptyState
             icon="ShoppingBag"
             title="لا توجد طلبات متاحة الآن"
             message="ستظهر الطلبات الجديدة هنا فور قيام العملاء بالطلب في منطقتك."
           />
-        </View>
+        </ScrollView>
       ) : (
         <FlatList
           style={styles.pool}
-          contentContainerStyle={styles.poolContent}
+          contentContainerStyle={[
+            styles.poolContent,
+            {
+              paddingBottom:
+                Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 16) + 80,
+            },
+          ]}
           data={orders}
           keyExtractor={(item) => item.id}
+          refreshControl={refreshControl}
           renderItem={renderOrder}
           ListHeaderComponent={
             <Surface style={[styles.driverIntro, { backgroundColor: colors.secondary }]}>

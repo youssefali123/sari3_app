@@ -14,6 +14,7 @@ import {
 import Animated from 'react-native-reanimated';
 import { Area } from '../domain/entities/Area';
 import { Icon } from '@/shared/ui/components/Icon';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, useTheme } from '@/shared/ui/theme';
 import {
   SkeletonCard,
@@ -48,6 +49,7 @@ export function AreaPickerModal({
 }: AreaPickerModalProps) {
   const colors = useColors();
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
   const animatedKeyboardStyle = useSmoothKeyboardElevation();
 
@@ -138,6 +140,7 @@ export function AreaPickerModal({
             {
               backgroundColor: colors.card,
               borderColor: colors.border,
+              paddingBottom: Math.max(insets.bottom + 12, 24),
             },
             animatedKeyboardStyle,
           ]}
@@ -736,7 +739,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     paddingHorizontal: 20,
     paddingTop: 12,
-    paddingBottom: Platform.OS === 'ios' ? 36 : 24,
     maxHeight: '85%',
     ...Platform.select({
       ios: {

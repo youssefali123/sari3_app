@@ -32,7 +32,7 @@ export function StoreConflictModal() {
     if (pendingBatch) {
       dispatch(confirmBatchReplace());
       // Order Again hand-off: standard checkout for explicit confirmation.
-      router.push('/(customer)/checkout');
+      router.push('/checkout');
     } else {
       confirmConflictResolution();
     }

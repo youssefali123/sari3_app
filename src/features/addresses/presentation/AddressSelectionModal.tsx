@@ -1,10 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   FlatList,
   Keyboard,
-  KeyboardEvent,
   Modal,
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -18,6 +16,7 @@ import { Input } from '@/shared/ui/components/Input';
 import { SkeletonCard, useSmoothKeyboardElevation } from '@/shared/ui/motion';
 import { EmptyState, PrimaryButton } from '@/shared/ui/components/AppUI';
 import { Icon } from '@/shared/ui/components/Icon';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, useTheme } from '@/shared/ui/theme';
 
 interface AddressSelectionModalProps {
@@ -45,6 +44,7 @@ export function AddressSelectionModal({
 }: AddressSelectionModalProps) {
   const colors = useColors();
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const animatedKeyboardStyle = useSmoothKeyboardElevation();
 
   const [showForm, setShowForm] = useState(false);
@@ -99,7 +99,10 @@ export function AddressSelectionModal({
         <Animated.View
           style={[
             styles.sheet,
-            { backgroundColor: colors.card },
+            {
+              backgroundColor: colors.card,
+              paddingBottom: Math.max(insets.bottom + 12, 24),
+            },
             animatedKeyboardStyle,
           ]}
         >
@@ -232,7 +235,6 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 28,
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: Platform.OS === 'ios' ? 34 : 24,
     maxHeight: '85%',
   },
   header: {

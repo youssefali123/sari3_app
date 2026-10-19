@@ -1,6 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useDriverAvailability } from '@/features/drivers/application/hooks/useDriverAvailability';
 import { useDriverAreas } from '@/features/drivers/application/hooks/useDriverAreas';
@@ -23,13 +23,23 @@ import { Icon } from '@/shared/ui/components/Icon';
  * Surface cards, Tajawal typography, and clean Arabic copy.
  */
 export default function DriverProfileScreen() {
-  const router = useRouter();
+  const router = useAppRouter();
   const colors = useColors();
   const { theme } = useTheme();
   const { profile, signOut } = useAuth();
   const { isAvailable } = useDriverAvailability();
-  const { areaNames, hasAssignedAreas, isLoading: areasLoading } = useDriverAreas();
-  const { data: historyData } = useDriverHistory();
+  const { areaNames, hasAssignedAreas, isLoading: areasLoading, refetch: refetchAreas } = useDriverAreas();
+  const { data: historyData, refetch: refetchHistory, isRefetching: historyRefetching } = useDriverHistory();
+  const [refreshing, setRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([refetchAreas?.(), refetchHistory?.()]);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const completedDeliveries = (historyData ?? []).filter(
     (e) => e.finalStatus === 'completed',
@@ -67,7 +77,10 @@ export default function DriverProfileScreen() {
   return (
     <AppScreen>
       <BrandHeader title="حسابي" subtitle="ملف كابتن التوصيل" />
-      <PageScroll>
+      <PageScroll
+        refreshing={refreshing || historyRefetching}
+        onRefresh={() => void handleRefresh()}
+      >
         {/* Driver Hero Banner */}
         <View style={[styles.profileHero, { backgroundColor: colors.primary }]}>
           <View style={styles.profileAvatar}>

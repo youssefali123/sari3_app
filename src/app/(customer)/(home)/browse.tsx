@@ -1,9 +1,8 @@
 import React, { useMemo } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 import { useQuery } from '@tanstack/react-query';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
+import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 
 import { useSelectedArea } from '@/features/areas/application/hooks/useSelectedArea';
 import { StoreType } from '@/features/restaurants/domain/entities/Store';
@@ -11,15 +10,11 @@ import { StoreRepository } from '@/features/restaurants/domain/repositories/Stor
 import { SupabaseStoreRepository } from '@/features/restaurants/infrastructure/SupabaseStoreRepository';
 import { StoreCard } from '@/features/restaurants/presentation/StoreCard';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
-import { BrandHeader } from '@/shared/ui/components/AppUI';
+import { AppScreen, BrandHeader } from '@/shared/ui/components/AppUI';
 import { Button } from '@/shared/ui/components/Button';
 import { EmptyState } from '@/shared/ui/components/EmptyState';
 import { ErrorState } from '@/shared/ui/components/ErrorState';
-import {
-  SkeletonCard,
-  listEntrance,
-  useEntranceAnimation,
-} from '@/shared/ui/motion';
+import { SkeletonCard } from '@/shared/ui/motion';
 
 const storeRepository: StoreRepository = new SupabaseStoreRepository();
 
@@ -46,10 +41,9 @@ const COPY = {
  * matching the old system's pattern while keeping the new design identity.
  */
 export default function BrowseScreen() {
-  const router = useRouter();
+  const router = useAppRouter();
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
-  const styles = createStyles(theme);
+  const styles = useMemo(() => createStyles(theme), [theme]);
   const params = useLocalSearchParams<{ type?: string }>();
   const storeType: StoreType = params.type === 'market' ? 'market' : 'restaurant';
   const copy = COPY[storeType];
@@ -77,7 +71,7 @@ export default function BrowseScreen() {
       : undefined;
 
   return (
-    <View style={[styles.container, { paddingTop: insets.top }]}>
+    <AppScreen>
       <BrandHeader
         title={copy.title}
         subtitle={countLabel ?? copy.subtitle}
@@ -111,39 +105,23 @@ export default function BrowseScreen() {
         />
       ) : (
         <FlatList
+          style={styles.container}
           data={sortedStores}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
-          renderItem={({ item, index }) => (
-            <ListRow index={index} itemKey={item.id}>
-              <StoreCard
-                store={item}
-                onPress={() => router.push(`/(customer)/(home)/store/${item.id}`)}
-              />
-            </ListRow>
+          refreshing={false}
+          onRefresh={refetch}
+          renderItem={({ item }) => (
+            <StoreCard
+              store={item}
+              onPress={() => router.push(`/store/${item.id}`)}
+            />
           )}
         />
       )}
-    </View>
+    </AppScreen>
   );
-}
-
-/** Animated entrance wrapper for each list row. */
-function ListRow({
-  index,
-  itemKey,
-  children,
-}: {
-  index: number;
-  itemKey: string;
-  children: React.ReactNode;
-}) {
-  const animatedStyle = useEntranceAnimation(index, {
-    ...listEntrance(),
-    itemKey,
-  });
-  return <Animated.View style={animatedStyle}>{children}</Animated.View>;
 }
 
 const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
