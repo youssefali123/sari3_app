@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import {
   FlatList,
   Keyboard,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,12 +18,12 @@ import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Animated from 'react-native-reanimated';
 import { Input } from '@/shared/ui/components/Input';
-import { SkeletonCard, useSmoothKeyboardElevation } from '@/shared/ui/motion';
+import { SkeletonCard } from '@/shared/ui/motion';
 import { ConfirmDialog } from '@/shared/ui/components/ConfirmDialog';
 import { AuthRequiredView } from '@/shared/ui/components/AuthRequiredModal';
 import { Icon } from '@/shared/ui/components/Icon';
+import { SwipeableBottomSheetModal } from '@/shared/ui/components/SwipeableBottomSheetModal';
 import {
   AppScreen,
   BrandHeader,
@@ -56,7 +55,6 @@ export default function SavedAddressesScreen() {
   const queryClient = useQueryClient();
   const colors = useColors();
   const { theme } = useTheme();
-  const animatedKeyboardStyle = useSmoothKeyboardElevation();
 
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<SavedDeliveryAddress | null>(null);
@@ -224,61 +222,13 @@ export default function SavedAddressesScreen() {
       </View>
 
       {/* Add / Edit Address Sheet Modal */}
-      <Modal
+      <SwipeableBottomSheetModal
         visible={Boolean(editing)}
-        animationType="slide"
-        transparent
-        statusBarTranslucent
-        onRequestClose={closeForm}
+        onClose={closeForm}
+        enableContentPan={false}
+        title={editing?.address ? 'تعديل العنوان' : 'إضافة عنوان جديد'}
       >
-        <View style={styles.backdrop}>
-          {/* Tapping backdrop dismisses keyboard and closes modal */}
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => {
-              Keyboard.dismiss();
-              closeForm();
-            }}
-          />
-
-          <Animated.View
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: colors.card,
-                paddingBottom: Math.max(insets.bottom + 12, 24),
-              },
-              animatedKeyboardStyle,
-            ]}
-          >
-            {/* Sheet Header */}
-            <View style={styles.sheetHeader}>
-              <Pressable
-                onPress={() => {
-                  Keyboard.dismiss();
-                  closeForm();
-                }}
-                hitSlop={8}
-                style={styles.closeBtn}
-                accessibilityRole="button"
-                accessibilityLabel="إغلاق"
-              >
-                <Icon name="X" size={20} color={colors.mutedForeground} />
-              </Pressable>
-              <Text
-                style={[
-                  styles.sheetTitle,
-                  {
-                    color: colors.foreground,
-                    fontFamily: theme.typography.headingSmall.fontFamily,
-                  },
-                ]}
-              >
-                {editing?.address ? 'تعديل العنوان' : 'إضافة عنوان جديد'}
-              </Text>
-            </View>
-
-            <ScrollView
+        <ScrollView
               showsVerticalScrollIndicator={false}
               keyboardShouldPersistTaps="always"
               contentContainerStyle={styles.formContent}
@@ -360,9 +310,7 @@ export default function SavedAddressesScreen() {
                 />
               </View>
             </ScrollView>
-          </Animated.View>
-        </View>
-      </Modal>
+      </SwipeableBottomSheetModal>
 
       {/* Delete Confirmation Dialog */}
       <ConfirmDialog

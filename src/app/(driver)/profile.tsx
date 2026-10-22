@@ -14,6 +14,7 @@ import {
   PageScroll,
   ProfileRow,
   Surface,
+  ThemeSelectorCard,
 } from '@/shared/ui/components';
 import { Icon } from '@/shared/ui/components/Icon';
 
@@ -269,6 +270,9 @@ export default function DriverProfileScreen() {
             {areasLoading ? 'جاري تحميل مناطق العمل…' : workAreaLabel}
           </Text>
         </Surface>
+
+        {/* Theme Appearance Selector */}
+        <ThemeSelectorCard />
 
         {/* Sign Out Section */}
         <Surface style={styles.signOutCard}>

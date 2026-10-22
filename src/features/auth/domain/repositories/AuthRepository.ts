@@ -17,6 +17,7 @@ export type AuthErrorType =
   | { kind: 'weak_password'; message: string }
   | { kind: 'email_not_confirmed' }
   | { kind: 'invalid_confirmation_code' }
+  | { kind: 'active_orders_exist'; message: string }
   | { kind: 'network_error' }
   | { kind: 'unknown'; message: string };
 
@@ -36,6 +37,8 @@ export interface AuthRepository {
   resendConfirmationCode(email: string): Promise<AuthResult<void>>;
   login(input: { email: string; password: string }): Promise<AuthResult<AuthUser>>;
   logout(): Promise<AuthResult<void>>;
+  /** Permanently deletes the authenticated user's account and all associated data. */
+  deleteAccount(): Promise<AuthResult<void>>;
   getSession(): Promise<{ user: AuthUser | null }>;
   onAuthStateChange(callback: (user: AuthUser | null) => void): () => void;
 }

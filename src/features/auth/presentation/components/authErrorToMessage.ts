@@ -16,6 +16,8 @@ export function authErrorToMessage(error: AuthErrorType): string {
       return 'يرجى تأكيد بريدك الإلكتروني أولاً عبر الرابط المرسل إليك.';
     case 'invalid_confirmation_code':
       return 'رمز التأكيد غير صحيح أو انتهت صلاحيته. يرجى المحاولة مجدداً.';
+    case 'active_orders_exist':
+      return error.message;
     case 'network_error':
       return 'تعذر الاتصال بالإنترنت. يرجى التحقق من الشبكة والمحاولة مجدداً.';
     case 'unknown':

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useColorScheme, View } from 'react-native';
+import { View } from 'react-native';
 import { Stack, ThemeProvider as NavigationThemeProvider, DarkTheme, DefaultTheme } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import * as ExpoNotifications from 'expo-notifications';
@@ -15,6 +15,7 @@ import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useNotificationSetup } from '@/features/notifications/application/hooks/useNotificationSetup';
 import { AppSplashScreen } from '@/shared/ui/components';
 import { screenTransitions } from '@/shared/ui/motion';
+import { useTheme } from '@/shared/ui/theme';
 
 // Prevent white flash during native transition: set native root window background immediately
 SystemUI.setBackgroundColorAsync('#1A1915').catch(() => {});
@@ -85,8 +86,7 @@ function RootNavigator() {
   // Dismiss splash when prerequisites are satisfied AND minimum 1.5s time has elapsed
   const canDismissSplash = isAppReady && minTimeElapsed;
 
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === 'dark';
+  const { isDark } = useTheme();
   const baseBg = isDark ? '#1A1915' : '#F8F9FA';
 
   useEffect(() => {
@@ -118,6 +118,7 @@ function RootNavigator() {
             }}
           >
             <Stack.Screen name="index" options={{ animation: 'none' }} />
+            <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
             <Stack.Screen name="(auth)" options={{ animation: 'fade' }} />
             <Stack.Screen name="(customer)" options={{ animation: 'fade' }} />
             <Stack.Screen name="(driver)" options={{ animation: 'fade' }} />

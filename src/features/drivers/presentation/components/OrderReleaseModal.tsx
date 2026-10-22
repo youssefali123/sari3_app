@@ -1,20 +1,16 @@
 import React, { useState } from 'react';
 import {
   Keyboard,
-  Modal,
-  Platform,
   Pressable,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useColors, useTheme } from '@/shared/ui/theme';
 import { Icon } from '@/shared/ui/components/Icon';
 import { PrimaryButton } from '@/shared/ui/components/AppUI';
-import { useSmoothKeyboardElevation } from '@/shared/ui/motion';
+import { SwipeableBottomSheetModal } from '@/shared/ui/components/SwipeableBottomSheetModal';
 
 interface OrderReleaseModalProps {
   visible: boolean;
@@ -38,8 +34,6 @@ export function OrderReleaseModal({
   const [reason, setReason] = useState('');
   const colors = useColors();
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
-  const animatedKeyboardStyle = useSmoothKeyboardElevation();
 
   const trimmed = reason.trim();
   const valid = trimmed !== '';
@@ -56,79 +50,50 @@ export function OrderReleaseModal({
   };
 
   return (
-    <Modal
+    <SwipeableBottomSheetModal
       visible={visible}
-      animationType="slide"
-      transparent
-      statusBarTranslucent
-      onRequestClose={handleClose}
-    >
-      <View style={styles.backdrop}>
-        {/* Tap outside to dismiss */}
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={handleClose}
-          accessibilityRole="none"
-          accessibilityLabel="إلغاء"
-        />
-
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-              paddingBottom:
-                Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 16) + 12,
-            },
-            animatedKeyboardStyle,
-          ]}
-        >
-          {/* Top handle bar */}
+      onClose={handleClose}
+      showHandle={true}
+      enableContentPan={true}
+      header={
+        <View style={styles.header}>
           <View
             style={[
-              styles.handle,
-              { backgroundColor: colors.mutedForeground, opacity: 0.25 },
+              styles.iconBadge,
+              {
+                backgroundColor: colors.destructive + '18',
+                borderColor: colors.destructive + '35',
+              },
             ]}
-          />
-
-          {/* Warning Icon Badge */}
-          <View style={styles.header}>
-            <View
-              style={[
-                styles.iconBadge,
-                {
-                  backgroundColor: colors.destructive + '18',
-                  borderColor: colors.destructive + '35',
-                },
-              ]}
-            >
-              <Icon name="AlertTriangle" size={24} color={colors.destructive} />
-            </View>
-
-            <Text
-              style={[
-                styles.title,
-                {
-                  color: colors.foreground,
-                  fontFamily: theme.typography.headingSmall.fontFamily,
-                },
-              ]}
-            >
-              الاعتذار عن توصيل الطلب؟
-            </Text>
-            <Text
-              style={[
-                styles.description,
-                {
-                  color: colors.mutedForeground,
-                  fontFamily: theme.typography.bodyMedium.fontFamily,
-                },
-              ]}
-            >
-              سيعود الطلب مباشرة إلى قائمة الطلبات المتاحة ليتمكن كابتن آخر من استلامه. يرجى كتابة سبب الاعتذار أدناه.
-            </Text>
+          >
+            <Icon name="AlertTriangle" size={24} color={colors.destructive} />
           </View>
+
+          <Text
+            style={[
+              styles.title,
+              {
+                color: colors.foreground,
+                fontFamily: theme.typography.headingSmall.fontFamily,
+              },
+            ]}
+          >
+            الاعتذار عن توصيل الطلب؟
+          </Text>
+          <Text
+            style={[
+              styles.description,
+              {
+                color: colors.mutedForeground,
+                fontFamily: theme.typography.bodyMedium.fontFamily,
+              },
+            ]}
+          >
+            سيعود الطلب مباشرة إلى قائمة الطلبات المتاحة ليتمكن كابتن آخر من استلامه. يرجى كتابة سبب الاعتذار أدناه.
+          </Text>
+        </View>
+      }
+    >
 
           {/* Reason Input */}
           <TextInput
@@ -214,9 +179,7 @@ export function OrderReleaseModal({
               </Text>
             </Pressable>
           </View>
-        </Animated.View>
-      </View>
-    </Modal>
+    </SwipeableBottomSheetModal>
   );
 }
 

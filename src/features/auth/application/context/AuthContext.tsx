@@ -42,6 +42,8 @@ interface AuthContextValue {
   confirmSignUp: (email: string, code: string) => Promise<AuthResult<AuthUser>>;
   resendConfirmationCode: (email: string) => Promise<AuthResult<void>>;
   signOut: () => Promise<void>;
+  /** Permanently deletes the account and all associated user data. */
+  deleteAccount: () => Promise<void>;
   /** Re-fetches the profile after a profile_not_found error (Retry path). Returns the fresh profile, if any. */
   refreshProfile: () => Promise<UserProfile | null>;
 }
@@ -164,6 +166,37 @@ export function AuthProvider({ queryClient, children }: AuthProviderProps) {
     setAuthError(null);
   }, [queryClient]);
 
+  const deleteAccount = useCallback(async () => {
+    try {
+      await notificationService.deactivateDevice();
+    } catch {
+      // Best-effort push token deactivation
+    }
+
+    const result = await authRepository.deleteAccount();
+    if (!result.success) {
+      if (result.error.kind === 'active_orders_exist') {
+        throw new Error(result.error.message);
+      }
+      throw new Error(
+        result.error.kind === 'unknown'
+          ? result.error.message
+          : 'فشل حذف الحساب. يرجى المحاولة لاحقاً.'
+      );
+    }
+
+    try {
+      await authRepository.logout();
+    } catch {
+      // Session already destroyed server-side
+    }
+
+    queryClient.clear();
+    setUser(null);
+    setProfile(null);
+    setAuthError(null);
+  }, [queryClient]);
+
   const refreshProfile = useCallback(async (): Promise<UserProfile | null> => {
     if (!user) return null;
     return loadProfile(user.id);
@@ -181,6 +214,7 @@ export function AuthProvider({ queryClient, children }: AuthProviderProps) {
       confirmSignUp,
       resendConfirmationCode,
       signOut,
+      deleteAccount,
       refreshProfile,
     }),
     [
@@ -194,6 +228,7 @@ export function AuthProvider({ queryClient, children }: AuthProviderProps) {
       confirmSignUp,
       resendConfirmationCode,
       signOut,
+      deleteAccount,
       refreshProfile,
     ],
   );

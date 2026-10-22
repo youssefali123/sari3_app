@@ -145,6 +145,38 @@ export class SupabaseAuthRepository implements AuthRepository {
     }
   }
 
+  async deleteAccount(): Promise<AuthResult<void>> {
+    try {
+      const { error } = await supabase.rpc('delete_user_account');
+      if (error) {
+        const errorMsg = error.message || '';
+        const errorDetails = (error as { details?: string }).details || '';
+        if (
+          errorMsg.includes('ACTIVE_ORDERS_EXIST') ||
+          errorDetails.includes('Cannot delete account while orders are active')
+        ) {
+          return {
+            success: false,
+            error: {
+              kind: 'active_orders_exist',
+              message: 'لا يمكن حذف الحساب أثناء وجود طلبات قيد التنفيذ أو التوصيل.',
+            },
+          };
+        }
+        return {
+          success: false,
+          error: {
+            kind: 'unknown',
+            message: error.message || 'فشل حذف الحساب.',
+          },
+        };
+      }
+      return { success: true, data: undefined };
+    } catch {
+      return { success: false, error: { kind: 'network_error' } };
+    }
+  }
+
   async getSession(): Promise<{ user: AuthUser | null }> {
     try {
       const { data } = await supabase.auth.getSession();

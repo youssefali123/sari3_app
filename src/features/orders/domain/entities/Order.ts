@@ -55,6 +55,7 @@ export interface Order {
   acceptedAt: string | null;
   deliveredAt: string | null;
   updatedAt: string;
+  idempotencyKey?: string | null;
   /** Set when the customer soft-hides the order from their history (never deleted). */
   customerHiddenAt: string | null;
 }

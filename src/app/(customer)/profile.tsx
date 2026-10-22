@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Alert, StyleSheet, Text, View } from 'react-native';
 import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
@@ -13,6 +13,7 @@ import {
   PrimaryButton,
   ProfileRow,
   Surface,
+  ThemeSelectorCard,
 } from '@/shared/ui/components';
 import { Icon } from '@/shared/ui/components/Icon';
 
@@ -20,7 +21,8 @@ export default function CustomerProfileScreen() {
   const router = useAppRouter();
   // Protected screen: guests are redirected to login with returnTo (FR-003).
   useRequireAuth('/(customer)/profile');
-  const { user, profile, signOut, isLoading: isAuthLoading } = useAuth();
+  const { user, profile, signOut, deleteAccount, isLoading: isAuthLoading } = useAuth();
+  const [isDeleting, setIsDeleting] = useState(false);
   const colors = useColors();
 
   if (!isAuthLoading && !user) {
@@ -58,6 +60,35 @@ export default function CustomerProfileScreen() {
                 'فشل تسجيل الخروج',
                 error instanceof Error ? error.message : 'يرجى المحاولة مرة أخرى.',
               );
+            }
+          },
+        },
+      ],
+    );
+  }
+
+  async function handleDeleteAccount() {
+    Alert.alert(
+      'حذف الحساب نهائياً',
+      'هل أنت متأكد من رغبتك في حذف حسابك؟ سيتم حذف جميع بياناتك وعناوينك وسجل طلباتك بشكل نهائي ولا يمكن التراجع عن هذا الإجراء.',
+      [
+        { text: 'إلغاء', style: 'cancel' },
+        {
+          text: 'حذف الحساب',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setIsDeleting(true);
+              await deleteAccount();
+              Alert.alert('تم حذف الحساب', 'تم حذف حسابك وجميع بياناتك بنجاح.');
+              router.replace('/(customer)/(home)');
+            } catch (error) {
+              Alert.alert(
+                'تعذر حذف الحساب',
+                error instanceof Error ? error.message : 'يرجى المحاولة مرة أخرى لاحقاً.',
+              );
+            } finally {
+              setIsDeleting(false);
             }
           },
         },
@@ -128,7 +159,16 @@ export default function CustomerProfileScreen() {
               Alert.alert('الدعم والمساعدة', 'فريق خدمة عملاء سريع متاح دائماً لدعمكم عبر واتساب والهاتف.')
             }
           />
+          <ProfileRow
+            icon="sparkles"
+            title="جولة في التطبيق"
+            detail="استعراض شاشات البداية ومميزات سريع"
+            onPress={() => router.push('/onboarding')}
+          />
         </Surface>
+
+        {/* Theme Appearance Selector */}
+        <ThemeSelectorCard />
 
         {/* Driver switch card if driver account */}
         {isDriver && (
@@ -154,15 +194,22 @@ export default function CustomerProfileScreen() {
           </Surface>
         )}
 
-        {/* Sign out section */}
+        {/* Account actions section */}
         <Surface style={styles.signOutCard}>
           <ProfileRow
-            icon="trash-outline"
+            icon="log-out-outline"
             title="تسجيل الخروج"
             detail="الخروج من الحساب بأمان"
-            isDestructive
             showChevron={false}
             onPress={() => void handleSignOut()}
+          />
+          <ProfileRow
+            icon="trash-outline"
+            title="حذف الحساب"
+            detail="حذف بياناتك وحسابك نهائياً"
+            isDestructive
+            showChevron={false}
+            onPress={isDeleting ? undefined : () => void handleDeleteAccount()}
           />
         </Surface>
 

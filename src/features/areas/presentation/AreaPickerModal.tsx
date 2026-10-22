@@ -1,9 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   Keyboard,
-  Modal,
   Platform,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,16 +9,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
 import { Area } from '../domain/entities/Area';
 import { Icon } from '@/shared/ui/components/Icon';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SwipeableBottomSheetModal } from '@/shared/ui/components/SwipeableBottomSheetModal';
 import { useColors, useTheme } from '@/shared/ui/theme';
 import {
   SkeletonCard,
   fireHaptic,
   useReducedMotion,
-  useSmoothKeyboardElevation,
 } from '@/shared/ui/motion';
 
 export interface AreaPickerModalProps {
@@ -49,12 +45,11 @@ export function AreaPickerModal({
 }: AreaPickerModalProps) {
   const colors = useColors();
   const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
   const reducedMotion = useReducedMotion();
-  const animatedKeyboardStyle = useSmoothKeyboardElevation();
 
   const [drilledParent, setDrilledParent] = useState<Area | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [listHeight, setListHeight] = useState<number | null>(null);
 
   // Parent area mapping for fast parent name resolution in search results
   const areaById = useMemo(() => {
@@ -70,8 +65,10 @@ export function AreaPickerModal({
     [areas],
   );
 
-  const childrenOf = (parentId: string): Area[] =>
-    areas.filter((a) => a.parentAreaId === parentId);
+  const childrenOf = useMemo(
+    () => (parentId: string): Area[] => areas.filter((a) => a.parentAreaId === parentId),
+    [areas],
+  );
 
   const handleClose = () => {
     Keyboard.dismiss();
@@ -114,135 +111,107 @@ export function AreaPickerModal({
     const children = childrenOf(drilledParent.id);
     if (!trimmedSearch) return children;
     return children.filter((c) => c.name.toLowerCase().includes(trimmedSearch));
-  }, [drilledParent, areas, trimmedSearch]);
+  }, [drilledParent, trimmedSearch, childrenOf]);
 
   return (
-    <Modal
+    <SwipeableBottomSheetModal
       visible={visible}
-      transparent
-      animationType="slide"
-      statusBarTranslucent
-      onRequestClose={handleClose}
-    >
-      <View style={styles.backdrop}>
-        {/* Scrim tap-to-dismiss */}
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={handleClose}
-          accessibilityRole="none"
-          accessibilityLabel="إغلاق"
-        />
-
-        {/* Bottom Sheet Container */}
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.card,
-              borderColor: colors.border,
-              paddingBottom: Math.max(insets.bottom + 12, 24),
-            },
-            animatedKeyboardStyle,
-          ]}
-        >
-          {/* Sheet Handle */}
-          <View
-            style={[
-              styles.handle,
-              { backgroundColor: colors.mutedForeground, opacity: 0.25 },
-            ]}
-          />
-
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.headerTitleWrap}>
-              {drilledParent ? (
-                <TouchableOpacity
-                  onPress={handleBackToTopLevel}
-                  hitSlop={8}
-                  style={[
-                    styles.backBadge,
-                    {
-                      backgroundColor: colors.muted,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                  accessibilityRole="button"
-                  accessibilityLabel="العودة لجميع المناطق"
-                >
-                  <Icon name="ArrowRight" size={16} color={colors.foreground} />
-                  <Text
-                    style={[
-                      styles.backBadgeText,
-                      {
-                        color: colors.foreground,
-                        fontFamily: theme.typography.button.fontFamily,
-                      },
-                    ]}
-                  >
-                    كل المحافظات
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <View
-                  style={[
-                    styles.headerIconBadge,
-                    {
-                      backgroundColor: colors.primarySubtle,
-                      borderColor: 'rgba(245, 189, 22, 0.3)',
-                    },
-                  ]}
-                >
-                  <Icon name="MapPin" size={20} color={colors.primaryPressed} />
-                </View>
-              )}
-
-              <View style={styles.headerTextCol}>
+      onClose={handleClose}
+      showHandle={true}
+      enableContentPan={false}
+      minHeight={280}
+      header={
+        <View style={styles.header}>
+          <View style={styles.headerTitleWrap}>
+            {drilledParent ? (
+              <TouchableOpacity
+                onPress={handleBackToTopLevel}
+                hitSlop={8}
+                style={[
+                  styles.backBadge,
+                  {
+                    backgroundColor: colors.muted,
+                    borderColor: colors.border,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel="العودة لجميع المناطق"
+              >
+                <Icon name="ArrowRight" size={16} color={colors.foreground} />
                 <Text
                   style={[
-                    styles.title,
+                    styles.backBadgeText,
                     {
                       color: colors.foreground,
-                      fontFamily: theme.typography.headingSmall.fontFamily,
-                    },
-                  ]}
-                  numberOfLines={1}
-                >
-                  {drilledParent ? drilledParent.name : 'اختر منطقة التوصيل'}
-                </Text>
-                <Text
-                  style={[
-                    styles.subtitle,
-                    {
-                      color: colors.mutedForeground,
-                      fontFamily: theme.typography.caption.fontFamily,
+                      fontFamily: theme.typography.button.fontFamily,
                     },
                   ]}
                 >
-                  {drilledParent
-                    ? 'اختر الحي التابع أو حدد كامل المنطقة'
-                    : 'حدد منطقتك لتصفح المتاجر والمطاعم المتاحة حولك'}
+                  كل المحافظات
                 </Text>
+              </TouchableOpacity>
+            ) : (
+              <View
+                style={[
+                  styles.headerIconBadge,
+                  {
+                    backgroundColor: colors.primarySubtle,
+                    borderColor: 'rgba(245, 189, 22, 0.3)',
+                  },
+                ]}
+              >
+                <Icon name="MapPin" size={20} color={colors.primaryPressed} />
               </View>
-            </View>
+            )}
 
-            {/* Close button */}
-            <TouchableOpacity
-              onPress={handleClose}
-              hitSlop={8}
-              style={[
-                styles.closeButton,
-                {
-                  backgroundColor: colors.muted,
-                  borderColor: colors.border,
-                },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel="إغلاق"
-            >
-              <Icon name="X" size={18} color={colors.mutedForeground} />
-            </TouchableOpacity>
+            <View style={styles.headerTextCol}>
+              <Text
+                style={[
+                  styles.title,
+                  {
+                    color: colors.foreground,
+                    fontFamily: theme.typography.headingSmall.fontFamily,
+                  },
+                ]}
+                numberOfLines={1}
+              >
+                {drilledParent ? drilledParent.name : 'اختر منطقة التوصيل'}
+              </Text>
+              <Text
+                style={[
+                  styles.subtitle,
+                  {
+                    color: colors.mutedForeground,
+                    fontFamily: theme.typography.caption.fontFamily,
+                  },
+                ]}
+              >
+                {drilledParent
+                  ? 'اختر الحي التابع أو حدد كامل المنطقة'
+                  : 'حدد منطقتك لتصفح المتاجر والمطاعم المتاحة حولك'}
+              </Text>
+            </View>
           </View>
+
+          {/* Close button */}
+          <TouchableOpacity
+            onPress={handleClose}
+            hitSlop={8}
+            style={[
+              styles.closeButton,
+              {
+                backgroundColor: colors.muted,
+                borderColor: colors.border,
+              },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="إغلاق"
+          >
+            <Icon name="X" size={18} color={colors.mutedForeground} />
+          </TouchableOpacity>
+        </View>
+      }
+    >
 
           {/* Search Bar */}
           <View
@@ -294,8 +263,16 @@ export function AreaPickerModal({
             </View>
           ) : (
             <ScrollView
-              style={styles.list}
+              style={[
+                styles.list,
+                listHeight
+                  ? { height: Math.min(Math.max(listHeight + 16, 140), 460) }
+                  : { minHeight: 140 },
+              ]}
               contentContainerStyle={styles.listContent}
+              onContentSizeChange={(_w, h) => {
+                setListHeight(h);
+              }}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
               nestedScrollEnabled
@@ -721,9 +698,7 @@ export function AreaPickerModal({
               )}
             </ScrollView>
           )}
-        </Animated.View>
-      </View>
-    </Modal>
+    </SwipeableBottomSheetModal>
   );
 }
 
@@ -845,10 +820,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   list: {
-    maxHeight: 400,
+    maxHeight: 460,
+    minHeight: 140,
   },
   listContent: {
-    paddingBottom: 8,
+    paddingBottom: 24,
     gap: 10,
   },
   featuredParentCard: {

@@ -5,6 +5,7 @@ export interface PlaceOrderInput {
   deliveryAddressId: string;
   paymentMethod: 'cash_on_delivery';
   couponCode?: string | null;
+  idempotencyKey: string;
   items: {
     productId: string;
     /** Required when the product has purchasable variants (e.g. sizes). */

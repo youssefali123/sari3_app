@@ -85,6 +85,7 @@ interface OrderRow {
   accepted_at: string | null;
   delivered_at: string | null;
   updated_at: string | null;
+  idempotency_key?: string | null;
   customer_hidden_at?: string | null;
 }
 
@@ -105,6 +106,7 @@ function mapOrder(row: OrderRow, items: OrderItemSnapshot[]): Order {
     deliveryFee: Number(row.delivery_fee),
     totalAmount: Number(row.total_amount),
     items,
+    idempotencyKey: row.idempotency_key ?? null,
     createdAt: row.created_at ?? '',
     acceptedAt: row.accepted_at,
     deliveredAt: row.delivered_at,
@@ -116,6 +118,7 @@ function mapOrder(row: OrderRow, items: OrderItemSnapshot[]): Order {
 export class SupabaseOrderRepository implements OrderRepository {
   async placeOrder(input: PlaceOrderInput): Promise<Order> {
     const p_payload = {
+      idempotency_key: input.idempotencyKey,
       store_id: input.storeId,
       delivery_address_id: input.deliveryAddressId,
       payment_method: input.paymentMethod,
@@ -141,6 +144,7 @@ export class SupabaseOrderRepository implements OrderRepository {
       subtotalAmount: number | string;
       deliveryFee: number | string;
       totalAmount: number | string;
+      idempotencyKey?: string | null;
       createdAt: string;
       acceptedAt: string | null;
       deliveredAt: string | null;
@@ -188,6 +192,7 @@ export class SupabaseOrderRepository implements OrderRepository {
       acceptedAt: payload.acceptedAt,
       deliveredAt: payload.deliveredAt,
       updatedAt: payload.updatedAt,
+      idempotencyKey: payload.idempotencyKey ?? null,
       // place_order creates fresh, visible orders
       customerHiddenAt: null,
     };

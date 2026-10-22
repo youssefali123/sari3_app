@@ -41,12 +41,14 @@ export async function initializeCartPersistence(): Promise<void> {
             storeId: parsed.storeId ?? null,
             storeName: parsed.storeName ?? null,
             items: parsed.items,
+            checkoutIntent: parsed.checkoutIntent ?? null,
           }),
         );
         previousSerializedCart = JSON.stringify({
           storeId: parsed.storeId ?? null,
           storeName: parsed.storeName ?? null,
           items: parsed.items,
+          checkoutIntent: parsed.checkoutIntent ?? null,
         });
       }
     }
@@ -71,6 +73,7 @@ store.subscribe(() => {
     storeId: state.cart.storeId,
     storeName: state.cart.storeName,
     items: state.cart.items,
+    checkoutIntent: state.cart.checkoutIntent,
   };
   const currentSerialized = JSON.stringify(currentCartData);
 

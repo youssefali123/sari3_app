@@ -24,6 +24,12 @@ function mapIconName(name: string): string {
     case 'log-in':
     case 'log-in-outline':
       return 'LogIn';
+    case 'log-out':
+    case 'log-out-outline':
+      return 'LogOut';
+    case 'user-x':
+    case 'user-x-outline':
+      return 'UserX';
     case 'arrow-back':
       return 'ArrowLeft';
     case 'chevron-back':

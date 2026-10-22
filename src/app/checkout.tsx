@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { BackHandler, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import * as Crypto from 'expo-crypto';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,11 +16,18 @@ import { maybePromptAndRegister } from '@/features/notifications/application/hoo
 import { SupabaseOrderRepository } from '@/features/orders/infrastructure/SupabaseOrderRepository';
 import {
   clearCart,
+  clearCheckoutIntent,
   selectCartItems,
   selectCartStoreId,
   selectCartStoreName,
   selectCartSubtotal,
+  selectCheckoutIntent,
+  setCheckoutIntent,
 } from '@/features/cart/application/cartSlice';
+import {
+  computeIntentFingerprint,
+  resolveCheckoutIntent,
+} from '@/features/cart/application/checkoutIntentResolver';
 import { useAppDispatch, useAppSelector } from '@/shared/lib/store';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
@@ -76,6 +84,8 @@ export default function CheckoutScreen() {
   const storeId = useAppSelector(selectCartStoreId);
   const storeName = useAppSelector(selectCartStoreName);
   const subtotal = useAppSelector(selectCartSubtotal);
+  const checkoutIntent = useAppSelector(selectCheckoutIntent);
+  const isSubmittingRef = useRef(false);
 
   const [selectedAddress, setSelectedAddress] = useState<SavedDeliveryAddress | null>(null);
   const [addressModalVisible, setAddressModalVisible] = useState(false);
@@ -134,9 +144,10 @@ export default function CheckoutScreen() {
   }
 
   const placeOrderMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async ({ idempotencyKey }: { idempotencyKey: string }) => {
       if (!effectiveAddress) throw new Error('اختر عنوان التوصيل أولاً.');
       return orderRepository.placeOrder({
+        idempotencyKey,
         storeId: storeId!,
         deliveryAddressId: effectiveAddress.id,
         paymentMethod: 'cash_on_delivery',
@@ -145,16 +156,65 @@ export default function CheckoutScreen() {
       });
     },
     onSuccess: (order) => {
+      isSubmittingRef.current = false;
       queryClient.invalidateQueries({ queryKey: ['orders'] });
+      dispatch(clearCheckoutIntent());
       dispatch(clearCart());
       // Contextual permission prompt (FR-013): first successful order only.
       maybePromptAndRegister(order.customerId).catch(() => undefined);
       router.replace(`/(customer)/orders/${order.id}`);
     },
     onError: (error: Error) => {
+      isSubmittingRef.current = false;
       showAlert('فشل تأكيد الطلب', error.message);
     },
   });
+
+  const handleConfirmOrder = useCallback(() => {
+    // Synchronous guard (Phase 4 / T013): immediately drop secondary taps prior to render state
+    if (isSubmittingRef.current || placeOrderMutation.isPending) {
+      return;
+    }
+    if (!effectiveAddress || !storeId) {
+      showAlert('تنبيه', 'اختر عنوان التوصيل أولاً.');
+      return;
+    }
+
+    isSubmittingRef.current = true;
+
+    const fingerprint = computeIntentFingerprint({
+      storeId,
+      deliveryAddressId: effectiveAddress.id,
+      couponCode: appliedCouponCode,
+      items: rpcItems,
+    });
+
+    const resolved = resolveCheckoutIntent({
+      currentFingerprint: fingerprint,
+      storedIntent: checkoutIntent,
+      generateKey: () => Crypto.randomUUID(),
+    });
+
+    // Persist active intent across potential app kills & restarts (Phase 5 / T016)
+    dispatch(
+      setCheckoutIntent({
+        idempotencyKey: resolved.idempotencyKey,
+        intentFingerprint: resolved.intentFingerprint,
+      }),
+    );
+
+    placeOrderMutation.mutate({
+      idempotencyKey: resolved.idempotencyKey,
+    });
+  }, [
+    effectiveAddress,
+    storeId,
+    appliedCouponCode,
+    rpcItems,
+    checkoutIntent,
+    dispatch,
+    placeOrderMutation,
+  ]);
 
   const total = subtotal - couponDiscount + DELIVERY_FEE;
 
@@ -279,9 +339,9 @@ export default function CheckoutScreen() {
         <PrimaryButton
           title="تأكيد الطلب"
           icon="checkmark-circle-outline"
-          onPress={() => placeOrderMutation.mutate()}
+          onPress={handleConfirmOrder}
           loading={placeOrderMutation.isPending}
-          disabled={!effectiveAddress}
+          disabled={!effectiveAddress || placeOrderMutation.isPending}
           testID="checkout-confirm"
         />
       </ScrollView>

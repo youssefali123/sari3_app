@@ -2,22 +2,20 @@ import React, { useState } from 'react';
 import {
   FlatList,
   Keyboard,
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
-import Animated from 'react-native-reanimated';
 import { SavedDeliveryAddress } from '../domain/entities/SavedDeliveryAddress';
 import { AddressCard } from './AddressCard';
 import { Input } from '@/shared/ui/components/Input';
-import { SkeletonCard, useSmoothKeyboardElevation } from '@/shared/ui/motion';
+import { SkeletonCard } from '@/shared/ui/motion';
 import { EmptyState, PrimaryButton } from '@/shared/ui/components/AppUI';
 import { Icon } from '@/shared/ui/components/Icon';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useColors, useTheme } from '@/shared/ui/theme';
+import { SwipeableBottomSheetModal } from '@/shared/ui/components/SwipeableBottomSheetModal';
+import { useColors } from '@/shared/ui/theme';
 
 interface AddressSelectionModalProps {
   visible: boolean;
@@ -43,9 +41,6 @@ export function AddressSelectionModal({
   onAddNew,
 }: AddressSelectionModalProps) {
   const colors = useColors();
-  const { theme } = useTheme();
-  const insets = useSafeAreaInsets();
-  const animatedKeyboardStyle = useSmoothKeyboardElevation();
 
   const [showForm, setShowForm] = useState(false);
   const [label, setLabel] = useState('');
@@ -79,59 +74,28 @@ export function AddressSelectionModal({
   }
 
   return (
-    <Modal
+    <SwipeableBottomSheetModal
       visible={visible}
-      animationType="slide"
-      transparent
-      statusBarTranslucent
-      onRequestClose={onClose}
+      onClose={onClose}
+      enableContentPan={false}
+      title={showForm ? 'إضافة عنوان توصيل' : 'اختر عنوان التوصيل'}
+      headerRight={
+        showForm ? (
+          <Pressable
+            onPress={() => {
+              Keyboard.dismiss();
+              setShowForm(false);
+            }}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="رجوع"
+            style={styles.closeBtn}
+          >
+            <Icon name="ArrowRight" size={20} color={colors.mutedForeground} />
+          </Pressable>
+        ) : undefined
+      }
     >
-      <View style={styles.backdrop}>
-        {/* Tapping outside dismisses keyboard and closes modal */}
-        <Pressable
-          style={StyleSheet.absoluteFill}
-          onPress={() => {
-            Keyboard.dismiss();
-            onClose();
-          }}
-        />
-
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: colors.card,
-              paddingBottom: Math.max(insets.bottom + 12, 24),
-            },
-            animatedKeyboardStyle,
-          ]}
-        >
-          {/* Header */}
-          <View style={styles.header}>
-            <Pressable
-              onPress={() => {
-                Keyboard.dismiss();
-                onClose();
-              }}
-              hitSlop={8}
-              accessibilityRole="button"
-              accessibilityLabel="إغلاق"
-              style={styles.closeBtn}
-            >
-              <Icon name="X" size={20} color={colors.mutedForeground} />
-            </Pressable>
-            <Text
-              style={[
-                styles.title,
-                {
-                  color: colors.foreground,
-                  fontFamily: theme.typography.headingSmall.fontFamily,
-                },
-              ]}
-            >
-              {showForm ? 'إضافة عنوان توصيل' : 'اختر عنوان التوصيل'}
-            </Text>
-          </View>
 
           {showForm ? (
             <ScrollView
@@ -218,9 +182,7 @@ export function AddressSelectionModal({
               />
             </View>
           ) : null}
-        </Animated.View>
-      </View>
-    </Modal>
+    </SwipeableBottomSheetModal>
   );
 }
 

@@ -21,6 +21,8 @@ export { LoadingState } from './LoadingState';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
 export { Sari3BottomSheet } from './Sari3BottomSheet';
+export { SwipeableBottomSheetModal } from './SwipeableBottomSheetModal';
+export type { SwipeableBottomSheetModalProps } from './SwipeableBottomSheetModal';
 export { ConfirmDialog } from './ConfirmDialog';
 export { AuthRequiredModal, AuthRequiredView } from './AuthRequiredModal';
 export { AppLogo } from './AppLogo';
@@ -39,6 +41,8 @@ export type { TabBarButtonProps } from './TabBarButton';
 export { ModernFloatingTabBar } from './ModernFloatingTabBar';
 export type { ModernFloatingTabBarProps } from './ModernFloatingTabBar';
 export { OfflineNoticeBanner } from '@/features/drivers/presentation/components/OfflineNoticeBanner';
+export { ThemeSelectorCard } from './ThemeSelectorCard';
+export type { ThemeSelectorCardProps } from './ThemeSelectorCard';
 
 // AppUI primitives (SOURCE project parity)
 export {

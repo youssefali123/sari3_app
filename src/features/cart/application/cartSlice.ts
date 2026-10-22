@@ -1,5 +1,6 @@
 import { createSelector, createSlice, PayloadAction } from '@reduxjs/toolkit';
 import { CartItem } from '../domain/entities/CartItem';
+import { CheckoutIntent } from '../domain/entities/CheckoutIntent';
 import { generateCartItemId } from '../domain/cartUtils';
 
 interface AddItemPayload {
@@ -18,6 +19,7 @@ interface CartState {
   storeId: string | null;
   storeName: string | null;
   items: CartItem[];
+  checkoutIntent: CheckoutIntent | null;
   // Conflict modal transient state (BR-002, BR-010): no silent cart replacement.
   conflictState: {
     isOpen: boolean;
@@ -31,6 +33,7 @@ const initialState: CartState = {
   storeId: null,
   storeName: null,
   items: [],
+  checkoutIntent: null,
   conflictState: {
     isOpen: false,
     pendingItem: null,
@@ -92,11 +95,22 @@ export const cartSlice = createSlice({
       }
     },
 
-    /** Resets items and store ownership. */
+    /** Sets active checkout intent (idempotency key & purchase fingerprint). */
+    setCheckoutIntent(state, action: PayloadAction<CheckoutIntent>) {
+      state.checkoutIntent = action.payload;
+    },
+
+    /** Clears active checkout intent upon successful order placement. */
+    clearCheckoutIntent(state) {
+      state.checkoutIntent = null;
+    },
+
+    /** Resets items, store ownership, and pending checkout intent. */
     clearCart(state) {
       state.items = [];
       state.storeId = null;
       state.storeName = null;
+      state.checkoutIntent = null;
       state.conflictState = initialState.conflictState;
     },
 
@@ -109,6 +123,7 @@ export const cartSlice = createSlice({
       state.items = [item];
       state.storeId = storeId;
       state.storeName = storeName;
+      state.checkoutIntent = null;
       state.conflictState = initialState.conflictState;
     },
 
@@ -136,6 +151,7 @@ export const cartSlice = createSlice({
       state.storeId = storeId;
       state.storeName = storeName;
       state.items = items;
+      state.checkoutIntent = null;
       state.conflictState = initialState.conflictState;
     },
 
@@ -166,11 +182,13 @@ export const cartSlice = createSlice({
         storeId: string | null;
         storeName: string | null;
         items: CartItem[];
+        checkoutIntent?: CheckoutIntent | null;
       }>,
     ) {
       state.storeId = action.payload.storeId;
       state.storeName = action.payload.storeName;
       state.items = action.payload.items;
+      state.checkoutIntent = action.payload.checkoutIntent ?? null;
       state.conflictState = initialState.conflictState;
     },
   },
@@ -188,6 +206,8 @@ export const {
   setConflictBatchPrompt,
   confirmBatchReplace,
   hydrateCart,
+  setCheckoutIntent,
+  clearCheckoutIntent,
 } = cartSlice.actions;
 
 // Selectors
@@ -195,6 +215,8 @@ export const selectCartItems = (state: { cart: CartState }) => state.cart.items;
 export const selectCartStoreId = (state: { cart: CartState }) => state.cart.storeId;
 export const selectCartStoreName = (state: { cart: CartState }) =>
   state.cart.storeName;
+export const selectCheckoutIntent = (state: { cart: CartState }) =>
+  state.cart.checkoutIntent;
 
 export const selectCartItemCount = createSelector(
   [selectCartItems],

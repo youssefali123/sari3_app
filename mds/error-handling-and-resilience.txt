@@ -1,0 +1,134 @@
+We need an error-handling and resilience pass over the existing app: user-facing Arabic error messages instead of raw server strings, correct network/foreground behavior for server state, Realtime recovery after disconnects, safe handling of writes whose outcome is unknown, a root error boundary, cart hydration at startup, and cart price/availability revalidation before checkout.
+
+IMPORTANT:
+Do NOT immediately implement code.
+First inspect the items listed in section 0, then update the SpecKit artifacts (spec.md, plan.md, data-model.md, contracts/, tasks.md) consistently.
+
+Follow the existing constitution and architecture:
+- Feature-first, lightweight Clean Architecture; dependency direction Presentation → Application → Domain ← Infrastructure
+- Domain/Application must not import Supabase, Expo, React Native, AsyncStorage, TanStack Query, or Redux
+- shared/ must not import from any feature and must contain no business logic
+- TanStack Query owns server state; Redux owns cart/client state only
+- Supabase/Postgres is the server authority; anything the client does here is UX only
+- Realtime and push stay separate concerns behind domain interfaces
+- Do not add unnecessary abstractions or new infrastructure
+
+==================================================
+0. VERIFIED EVIDENCE AND WHAT TO INSPECT
+==================================================
+A live status inventory already established these facts. Re-verify the ones you rely on, do not re-derive them from scratch:
+- Every infrastructure repository does `throw new Error(error.message)`. The only domain error type in the repo is AuthErrorType ({ kind: ... }) in AuthRepository.ts. Mirror that pattern; inspect how auth surfaces it (returned vs thrown) before designing.
+- Screens render raw strings: checkout.tsx (showAlert('فشل تأكيد الطلب', error.message)), orders/[id].tsx (cancel), (driver)/active-order.tsx, (driver)/available-orders/[id].tsx, ActiveOrderCard.tsx, OrderReleaseModal.tsx.
+- queryClient.ts: refetchOnWindowFocus false, refetchOnReconnect true, but onlineManager and focusManager are NOT wired, so no reconnect or foreground refetch ever happens on device. useNetworkStatus / ExpoNetworkStatusService live inside the drivers feature.
+- SupabaseDriverRealtimeService and SupabaseOrderRealtimeService call .subscribe() with no status callback. Inspect ALL realtime subscriptions, including useActiveOrder's and the customer order-detail one.
+- No root ErrorBoundary exists.
+- Cart persistence exists in src/shared/lib/store.ts but rehydration is fire-and-forget (void initializeCartPersistence()). The previous feature (order-placement-idempotency) added a persisted {key, fingerprint} next to the cart; hydration must include it.
+- The cart stores baseUnitPrice and add-on unit-price snapshots from add-to-cart time; place_order recomputes totals from live prices.
+- mutations.retry was set to 0 by the previous feature. Confirm it is in place; do not change it.
+Also inspect: supabase.ts (is supabase.auth.startAutoRefresh()/stopAutoRefresh() tied to AppState?), the existing sign-out sequence (cache clearing + push-token deactivation), the splash-screen gating in the root layout, the shared ErrorView/ErrorState component, how validate_coupon's rejection_reason is displayed, and the new error codes the previous feature reported (e.g. MISSING_IDEMPOTENCY_KEY) so they get mapped too.
+
+==================================================
+1. ERROR TRANSLATION — RESOLVED DESIGN, DO NOT REOPEN
+==================================================
+Principle: presentation never parses strings and never shows error.message.
+- Infrastructure classifies backend errors and throws typed errors. The classifier inspects PostgREST/Postgres codes (SQLSTATE + the exception message prefix) and the network failure shape. It lives next to supabase.ts (infrastructure), because it depends on Supabase error shapes.
+- Most server exceptions arrive as P0001 with the message equal to a code ("STORE_CLOSED"); some carry a suffix after a colon ("ORDER_CANNOT_BE_CANCELLED: ..."), and some use plain English text ("Driver already has an active order", 23505). Match the prefix/SQLSTATE, never the whole message. Do NOT edit any RPC body (claim_order, release_order, advance_order_status, cancel_order...) to unify messages.
+- Generic kinds in shared (pure TypeScript, no business logic): network, session_expired, permission_denied, unexpected.
+- Business kinds in each feature's domain, following the AuthErrorType { kind } pattern: orders (store_closed, store_not_found, address_not_found, product_unavailable, product_variant_required, addon_unavailable, coupon_* variants, order_cannot_be_cancelled, order_state_changed, missing_idempotency_key...), driver fulfillment (already_has_active_order, order_not_assigned, invalid_transition, release_reason_required, order_status_changed...). Propose the final lists in contracts/ for my review.
+- Structured results that are not exceptions stay structured and also get Arabic messages in the UI: claim_order {claimed:false}, advance_order_status {success:false, error:'ORDER_STATUS_CHANGED'}, validate_coupon {is_valid:false, rejection_reason}, get_order_driver_info NULL.
+- Suggested classification (verify against the live function bodies): user-actionable business errors (STORE_CLOSED, PRODUCT_UNAVAILABLE, ADDON_UNAVAILABLE, COUPON_*, ADDRESS_NOT_FOUND, ORDER_CANNOT_BE_CANCELLED); state-changed conflicts that should trigger a refetch (ORDER_STATUS_CHANGED, ORDER_STATE_CHANGED, ORDER_NOT_ACTIVE_OR_NOT_ASSIGNED, ORDER_NOT_FOUND_OR_NOT_ASSIGNED, 23505 "Driver already has an active order", claimed:false); auth (AUTH_REQUIRED, NOT_AUTHENTICATED, expired JWT); permission (ONLY_*, 42501 variants); should-never-reach-the-user (invalid transition trigger, orders_column_guard, MISSING_IDEMPOTENCY_KEY, PRODUCT_VARIANT_REQUIRED) which map to the generic unexpected message.
+- Verify empirically, do not assume: what supabase-js actually returns for (a) airplane mode, (b) an expired/invalid token, (c) permission denied, (d) a business exception. Record the observed shapes in the contract.
+- Arabic messages: one centralized dictionary per feature keyed by error kind, plus shared generic messages. No inline strings in components. Match the existing copy tone (short, Modern Standard Arabic, says what happened and what to do next). Structure the dictionaries so another locale can be added later; do NOT introduce an i18n framework in this feature.
+- Replace every raw error.message display with the dictionary lookup, using the existing shared error component where a full-screen/inline error state is needed. In development only, log the raw error to the console. No remote error-reporting service in this feature.
+
+==================================================
+2. NETWORK AND FOREGROUND WIRING — RESOLVED, DO NOT REOPEN
+==================================================
+- Wire TanStack Query's onlineManager to the real connectivity signal and focusManager to AppState, in app-level setup under shared/lib. shared/ must not import from features/drivers: use expo-network directly or move the existing service to a shared location (decide in planning, justify). Treat an unknown reachability value (null/undefined) as online; never block on unknown.
+- Enable refetchOnWindowFocus (it only works through focusManager); the existing staleTime of 30s limits refetch frequency.
+- CRITICAL SIDE EFFECT: once onlineManager reflects reality, TanStack's default networkMode ('online') PAUSES mutations fired while offline and runs them automatically when connectivity returns. For writes (placing an order, claiming, cancelling...) that is wrong: the user would see a stuck spinner and the write could fire minutes later unexpectedly. Set mutations' networkMode to 'always' so writes execute immediately and fail fast with a classified network error. Queries keep the default (paused while offline, cached data stays visible).
+- A data screen that has no cached data while offline must show an explicit offline state with a retry action, not an endless spinner (use fetchStatus === 'paused' + no data).
+- If supabase.auth.startAutoRefresh()/stopAutoRefresh() is not tied to AppState (Supabase's React Native guidance), add it. If auth refresh fails and the session is lost, reuse the existing sign-out sequence (cache clearing etc.), return to guest browsing, and show one clear "session expired, please sign in again" message; a protected action in progress goes through the existing useRequireAuth flow. Confirm every step of the sign-out sequence tolerates an already-invalid session (e.g. push-token deactivation cannot assume a valid session).
+
+==================================================
+3. WRITES WITH UNKNOWN OUTCOME — RESOLVED, DO NOT REOPEN
+==================================================
+Rule: a network error on a write means the outcome is UNKNOWN. The UI must not claim definitive failure, and must reconcile against server truth.
+- On a network-kind error from any mutation, invalidate the related queries so the screen shows the real state.
+- place_order: the previous feature made re-tapping safe (same idempotency key). The message must say the connection failed and that retrying will not duplicate the order. Also invalidate the orders list so an order that was actually created appears.
+- claim_order: if the response is lost and a retry returns "already has an active order" (23505), that can be a success in disguise. After a network error or a 23505, refetch the driver's active order and reconcile: if the order is now the driver's active order, show it instead of an error.
+- cancel_order / release_order / advance_order_status: a second attempt after a lost success returns a terminal-state conflict (ORDER_CANNOT_BE_CANCELLED, ORDER_NOT_ACTIVE_OR_NOT_ASSIGNED, ORDER_STATUS_CHANGED). Treat these state-changed kinds as "refetch and show current state", with a calm message, not an error dialog.
+- decline_order and toggle_driver_availability are already idempotent; they only need the network-error handling.
+- Do not add client-side retry loops, background queues, or offline write queues (offline-first is out of scope).
+
+==================================================
+4. REALTIME RECOVERY — RESOLVED, DO NOT REOPEN
+==================================================
+Supabase Realtime does not replay events missed while disconnected, so the only recovery is to refetch authoritative state.
+- Every realtime subscription must observe channel status (SUBSCRIBED / CHANNEL_ERROR / TIMED_OUT / CLOSED). When a channel returns to SUBSCRIBED after having been disconnected or errored, it must trigger a refetch of the related queries. Do not rely on replaying events.
+- Keep this behind the existing domain interfaces (OrderRealtimeService, DriverRealtimeService): no Supabase channel-status types in Domain or Application. Expose the concept as a domain-level "connection restored" signal (or have the infrastructure invoke the existing refetch callback), decide in planning and justify.
+- Before designing, verify empirically what the client does on a disconnect (toggle airplane mode with an order-detail screen open): does it rejoin by itself, or must the channel be re-created? Design for the observed behavior. Make sure channels are removed on unsubscribe and no duplicate channels leak across reconnects.
+
+==================================================
+5. ROOT ERROR BOUNDARY
+==================================================
+Export an ErrorBoundary from the root layout following Expo Router conventions. It shows an Arabic recovery screen with a retry action (using the retry the boundary provides). Show technical details only in development.
+- Verify how Expo Router mounts the boundary relative to AppProviders. The fallback may render outside the providers, so it must not depend on any provider (Theme, Redux, Query, Auth) or on loaded custom fonts unless verified available; use static token values and a safe font fallback.
+- No per-screen boundaries in this feature.
+
+==================================================
+6. CART HYDRATION AT STARTUP
+==================================================
+- Await cart rehydration (including the persisted idempotency {key, fingerprint}) as part of the startup gating, before the splash screen hides, together with the existing gates (session resolution, and fonts if already applied).
+- Never block startup indefinitely: if hydration throws or hangs, continue with an empty cart and log in development.
+- Acceptance: cold start straight into /cart or /checkout never flashes an empty cart.
+
+==================================================
+7. CART REVALIDATION BEFORE CHECKOUT — UX ONLY, SERVER STAYS AUTHORITATIVE
+==================================================
+Problem: the cart displays prices snapshotted at add-to-cart time, but place_order charges current prices, so the customer can be charged a different amount than the one they saw.
+- On entering Checkout (and on cart-screen mount if cheap), fetch the current price/availability for the cart's products, variants and add-ons via the existing product repository (add a read-only batch method only if none exists), as a TanStack query (server data).
+- Compare in a pure Domain/Application function (reconcileCart): detect price changes, unavailable products/variants/add-ons, closed store.
+- Required behavior, with the mechanism left to planning (suggested default in brackets): the user must never be silently charged a different price [update the cart snapshots to current prices and show a clear notice listing each change before they can confirm]; checkout must not be confirmable while an unavailable item remains [flag it in the cart with a one-tap remove; disable confirm until resolved].
+- If a revalidation use case already exists from the "Order Again" work, REUSE it; do not build a second one. If it does not exist yet, define it here as the shared one and say so.
+- This is a UX aid only. place_order remains the authority and its errors still map through section 1.
+- Cart state changes go through the existing cart slice (composite keys, single-store rule, conflict state unchanged).
+
+==================================================
+8. OUT OF SCOPE
+==================================================
+Offline-first or write queues; automatic retry of writes; a remote crash/error reporting service (Sentry etc., a separate decision); an i18n framework and English strings; a global offline banner; applied-coupon persistence across restarts; new RLS/RPC behavior (no migrations are expected in this feature; if you find one is needed, list it as an open decision instead of adding it); a test framework (propose it as a separate feature if none exists); any change to claim_order, release_order, cancel_order, advance_order_status, coupon logic, notification triggers, or pool-signal triggers.
+
+==================================================
+9. ACCEPTANCE SCENARIOS
+==================================================
+1. place_order on a closed store shows the Arabic closed-store message, no raw code.
+2. Every code in the server-error inventory (including new codes from the previous feature) maps to a kind and an Arabic message; a one-off completeness check compares the live functions' RAISE messages against the mapper's known codes.
+3. grep for `error.message` in presentation code returns zero displays of raw backend text.
+4. Airplane mode + tap confirm: fails fast with the network message, no endless spinner, no queued write that fires later; re-tapping after reconnect is safe.
+5. Returning from background refetches the visible stale queries (order detail, driver pool).
+6. Network restored refetches paused queries.
+7. Realtime drop and restore: while offline on an order-detail screen, change the order status server-side; after reconnect the UI shows the new status without user action.
+8. Expired/invalid session: the app returns to guest browsing with a single clear message; no raw 42501.
+9. A forced render crash (temporary dev-only trigger, removed afterwards) shows the Arabic fallback with working retry.
+10. Cold start into /cart or /checkout: cart and persisted key are present on first render.
+11. Product price changed while the cart was away: the customer is told before confirming, and the totals shown match what the server will charge.
+12. A product/add-on made unavailable: confirm is blocked until the customer resolves it.
+13. Driver claim with a lost response, then retry: the driver sees their active order, not a false "already has an active order" error.
+14. A lost-success cancel/release/advance followed by a retry shows the current state calmly, not an error dialog.
+15. Mutations never auto-retry and never queue while offline.
+16. Architecture check: Domain/Application import no Supabase/Expo/AsyncStorage/Redux/Query; shared/ imports nothing from features.
+
+==================================================
+10. VERIFICATION STANDARD
+==================================================
+Scenarios 4, 5, 6, 7, 8, 13 and 14 involve real device/network behavior or the live backend; verify them for real (airplane-mode toggles, live status changes, forced network failures), not by code review. For anything that must write to the live database, use rolled-back transactions or fully cleaned-up test data, and verify beforehand that no real push notification can be delivered. If anything needs a physical device that you do not have, say so explicitly and list the exact manual steps for me instead of claiming it passed.
+
+==================================================
+11. CONSTRAINTS
+==================================================
+Do NOT: parse error strings in presentation; display error.message; edit RPC bodies to unify messages; let mutations pause while offline; add retry loops or write queues; import Expo/Supabase into Domain/Application; import features from shared/; add an i18n framework or a crash-reporting service; build a second revalidation use case; block app startup indefinitely.
+
+At the end provide: files inspected; the complete server-error table (code → kind → message key) for my review; business rules added; client state and architecture changes; tasks.md changes; any migrations (expected: none); unresolved decisions needing my approval.
+
+Do not claim anything is implemented or verified until it has been checked for real.
