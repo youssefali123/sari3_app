@@ -9,6 +9,9 @@ import {
   View,
 } from 'react-native';
 import { SavedDeliveryAddress } from '../domain/entities/SavedDeliveryAddress';
+import { AddressException } from '../domain/entities/AddressError';
+import { getAddressErrorMessage } from './messages/addressesErrorMessages.ar';
+import { classifyAddressError } from '../infrastructure/addressErrorClassifier';
 import { AddressCard } from './AddressCard';
 import { Input } from '@/shared/ui/components/Input';
 import { SkeletonCard } from '@/shared/ui/motion';
@@ -67,7 +70,9 @@ export function AddressSelectionModal({
       setShowForm(false);
       onClose();
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'تعذر حفظ العنوان.');
+      if (__DEV__) console.error('[AddressSelectionModalError]', error);
+      const addrError = error instanceof AddressException ? error : classifyAddressError(error);
+      setFormError(getAddressErrorMessage(addrError.kind));
     } finally {
       setSaving(false);
     }

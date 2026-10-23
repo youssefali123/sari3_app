@@ -16,6 +16,7 @@ import {
   ThemeSelectorCard,
 } from '@/shared/ui/components';
 import { Icon } from '@/shared/ui/components/Icon';
+import { getErrorMessageString } from '@/shared/lib/errorClassifier';
 
 export default function CustomerProfileScreen() {
   const router = useAppRouter();
@@ -55,10 +56,10 @@ export default function CustomerProfileScreen() {
               // Centralized signOut: also purges the TanStack Query cache.
               await signOut();
               router.replace('/(customer)/(home)');
-            } catch (error) {
+            } catch {
               Alert.alert(
                 'فشل تسجيل الخروج',
-                error instanceof Error ? error.message : 'يرجى المحاولة مرة أخرى.',
+                'حدث خطأ أثناء تسجيل الخروج. يرجى المحاولة مرة أخرى لاحقاً.',
               );
             }
           },
@@ -83,9 +84,15 @@ export default function CustomerProfileScreen() {
               Alert.alert('تم حذف الحساب', 'تم حذف حسابك وجميع بياناتك بنجاح.');
               router.replace('/(customer)/(home)');
             } catch (error) {
+              const msg = getErrorMessageString(error);
+              const isOrderActive =
+                msg.includes('طلبات قيد التنفيذ') ||
+                msg.includes('ACTIVE_ORDERS_EXIST');
               Alert.alert(
                 'تعذر حذف الحساب',
-                error instanceof Error ? error.message : 'يرجى المحاولة مرة أخرى لاحقاً.',
+                isOrderActive
+                  ? 'لا يمكن حذف الحساب أثناء وجود طلبات قيد التنفيذ أو التوصيل.'
+                  : 'تعذر حذف الحساب حالياً. يرجى المحاولة مرة أخرى لاحقاً.',
               );
             } finally {
               setIsDeleting(false);

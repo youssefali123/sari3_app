@@ -17,7 +17,9 @@ export function authErrorToMessage(error: AuthErrorType): string {
     case 'invalid_confirmation_code':
       return 'رمز التأكيد غير صحيح أو انتهت صلاحيته. يرجى المحاولة مجدداً.';
     case 'active_orders_exist':
-      return error.message;
+      return 'لا يمكن حذف الحساب أثناء وجود طلبات قيد التنفيذ أو التوصيل.';
+    case 'session_expired':
+      return 'انتهت صلاحية الجلسة، يرجى تسجيل الدخول مرة أخرى.';
     case 'network_error':
       return 'تعذر الاتصال بالإنترنت. يرجى التحقق من الشبكة والمحاولة مجدداً.';
     case 'unknown':

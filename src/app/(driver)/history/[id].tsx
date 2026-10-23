@@ -7,6 +7,7 @@ import {
   AppScreen,
   BrandHeader,
   EmptyState,
+  ErrorState,
   LoadingState,
   PageScroll,
   Surface,
@@ -15,6 +16,8 @@ import { Icon } from '@/shared/ui/components/Icon';
 import { formatDateTime } from '@/shared/utils/formatting';
 import { useDriverHistory } from '@/features/drivers/application/hooks/useDriverHistory';
 import { HistoryStatus } from '@/features/drivers/domain/entities/DeliveryHistoryEntry';
+import { classifyDriverError } from '@/features/drivers/infrastructure/driverErrorClassifier';
+import { getDriverErrorMessage } from '@/features/drivers/presentation/messages/driversErrorMessages.ar';
 
 const STATUS_LABELS: Record<HistoryStatus, string> = {
   completed: 'تم التسليم بنجاح',
@@ -47,9 +50,11 @@ export default function DriverDeliveryDetailScreen() {
       <AppScreen>
         <BrandHeader title="تفاصيل الرحلة" onBack={() => router.back()} />
         <View style={styles.centerContainer}>
-          <Text style={[styles.errorText, { color: colors.destructive }]}>
-            {error.message}
-          </Text>
+          <ErrorState
+            title="تعذر تحميل تفاصيل الرحلة"
+            message={getDriverErrorMessage(classifyDriverError(error).kind)}
+            onRetry={() => void refetch()}
+          />
         </View>
       </AppScreen>
     );

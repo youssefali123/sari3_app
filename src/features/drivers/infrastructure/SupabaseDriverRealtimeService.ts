@@ -21,6 +21,7 @@ export class SupabaseDriverRealtimeService implements DriverRealtimeService {
     // (driver_id IS NULL) — a drivers-visible orders policy would leak the
     // customer's delivery address (FR-004). The signal carries only the
     // order_id; the hook refetches the pool via get_available_orders().
+    let hasConnectedOnce = false;
     const channel = supabase
       .channel(`driver-available-orders-${++channelSeq}`)
       .on(
@@ -32,10 +33,18 @@ export class SupabaseDriverRealtimeService implements DriverRealtimeService {
         },
         () => onOrdersChanged(),
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          if (hasConnectedOnce) {
+            // Reconnected after a drop! Refetch to sync any missed events.
+            onOrdersChanged();
+          }
+          hasConnectedOnce = true;
+        }
+      });
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }
 
@@ -43,6 +52,7 @@ export class SupabaseDriverRealtimeService implements DriverRealtimeService {
     orderId: string,
     onStatusChange: (status: string) => void,
   ): Unsubscribe {
+    let hasConnectedOnce = false;
     const channel = supabase
       .channel(`driver-active-order-${orderId}-${++channelSeq}`)
       .on(
@@ -59,10 +69,18 @@ export class SupabaseDriverRealtimeService implements DriverRealtimeService {
           onStatusChange(newStatus);
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          if (hasConnectedOnce) {
+            // Reconnected after a drop! Notify to trigger refetch.
+            onStatusChange('');
+          }
+          hasConnectedOnce = true;
+        }
+      });
 
     return () => {
-      supabase.removeChannel(channel);
+      void supabase.removeChannel(channel);
     };
   }
 }

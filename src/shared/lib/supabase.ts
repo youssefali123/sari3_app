@@ -63,3 +63,16 @@ export const supabase = createClient(
     },
   }
 );
+
+// Tells Supabase Auth to continuously refresh the session automatically
+// when the app is in the foreground, and pauses it when backgrounded (FR-008).
+if (!isSSR) {
+  const { AppState } = require('react-native');
+  AppState.addEventListener('change', (state: string) => {
+    if (state === 'active') {
+      supabase.auth.startAutoRefresh();
+    } else {
+      supabase.auth.stopAutoRefresh();
+    }
+  });
+}

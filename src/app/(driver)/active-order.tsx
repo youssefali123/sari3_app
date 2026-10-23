@@ -17,6 +17,11 @@ import {
   CancelledOrderNotice,
   useActiveOrder,
 } from '@/features/drivers/application/hooks/useActiveOrder';
+import { useAuth } from '@/features/auth/application/hooks/useAuth';
+import { DriverException } from '@/features/drivers/domain/entities/DriverError';
+import { getDriverErrorMessage } from '@/features/drivers/presentation/messages/driversErrorMessages.ar';
+import { classifyDriverError } from '@/features/drivers/infrastructure/driverErrorClassifier';
+import { ErrorState } from '@/shared/ui/components/ErrorState';
 import { ActiveOrderCard } from '@/features/drivers/presentation/components/ActiveOrderCard';
 import { OrderReleaseModal } from '@/features/drivers/presentation/components/OrderReleaseModal';
 import { Order } from '@/features/orders/domain/entities/Order';
@@ -38,6 +43,7 @@ const NEXT_STEP_LABELS: Record<string, string> = {
  * Surface cards, and Arabic statuses.
  */
 export default function ActiveOrderScreen() {
+  const { user } = useAuth();
   const {
     activeOrder,
     isLoading,
@@ -75,6 +81,12 @@ export default function ActiveOrderScreen() {
 
   // US3: when the active order disappears, tell the driver WHY if the customer cancelled it
   useEffect(() => {
+    // If the driver logged out or is unauthenticated, purge the last order reference and do not fetch
+    if (!user) {
+      lastActiveRef.current = null;
+      return;
+    }
+
     if (activeOrder) {
       lastActiveRef.current = activeOrder;
       return;
@@ -93,7 +105,7 @@ export default function ActiveOrderScreen() {
         }
       })
       .catch(() => undefined);
-  }, [activeOrder, queryClient]);
+  }, [activeOrder, queryClient, user]);
 
   const handleAdvance = async () => {
     if (!activeOrder || isAdvancing) return;
@@ -117,13 +129,16 @@ export default function ActiveOrderScreen() {
   }
 
   if (error && !activeOrder) {
+    const classified = classifyDriverError(error);
     return (
       <AppScreen>
         <BrandHeader title="طلباتي النشطة" subtitle="توصيلاتك الحالية" />
         <View style={styles.centerContainer}>
-          <Text style={[styles.errorText, { color: colors.destructive }]}>
-            {error.message}
-          </Text>
+          <ErrorState
+            message={getDriverErrorMessage(classified.kind)}
+            isOffline={classified.kind === 'network_error'}
+            onRetry={() => refetch()}
+          />
         </View>
       </AppScreen>
     );

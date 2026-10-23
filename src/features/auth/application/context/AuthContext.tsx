@@ -7,6 +7,8 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { Alert } from 'react-native';
+import { router } from 'expo-router';
 import type { QueryClient } from '@tanstack/react-query';
 import { AuthUser } from '../../domain/entities/AuthUser';
 import {
@@ -46,6 +48,8 @@ interface AuthContextValue {
   deleteAccount: () => Promise<void>;
   /** Re-fetches the profile after a profile_not_found error (Retry path). Returns the fresh profile, if any. */
   refreshProfile: () => Promise<UserProfile | null>;
+  /** Triggers the session expired dialog and resets user state (FR-008). */
+  notifySessionExpired: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -71,6 +75,60 @@ export function AuthProvider({ queryClient, children }: AuthProviderProps) {
   const [isProfileLoading, setIsProfileLoading] = useState(false);
   const [authError, setAuthError] = useState<AuthErrorKind | null>(null);
   const mountedRef = useRef(true);
+  const isExplicitSignOutRef = useRef(false);
+  const isAlertingSessionExpiredRef = useRef(false);
+  const userRef = useRef<AuthUser | null>(null);
+
+  const handleSessionExpired = useCallback(() => {
+    if (isAlertingSessionExpiredRef.current) return;
+    isAlertingSessionExpiredRef.current = true;
+
+    // Purge ALL customer-scoped server state before transitioning to guest
+    queryClient.clear();
+    setUser(null);
+    setProfile(null);
+    setAuthError(null);
+    userRef.current = null;
+
+    const onContinueAsGuest = () => {
+      isAlertingSessionExpiredRef.current = false;
+      try {
+        router.replace('/(customer)/(home)');
+      } catch {
+        // Safe fallback if navigation is unavailable
+      }
+    };
+
+    const onNavigateToLogin = () => {
+      isAlertingSessionExpiredRef.current = false;
+      try {
+        router.replace('/(auth)/login');
+      } catch {
+        // Safe fallback if navigation is unavailable
+      }
+    };
+
+    Alert.alert(
+      'انتهت الجلسة',
+      'انتهت الجلسة، يرجى تسجيل الدخول مرة أخرى.',
+      [
+        {
+          text: 'متابعة كزائر',
+          style: 'cancel',
+          onPress: onContinueAsGuest,
+        },
+        {
+          text: 'تسجيل الدخول',
+          style: 'default',
+          onPress: onNavigateToLogin,
+        },
+      ],
+      {
+        cancelable: true,
+        onDismiss: onContinueAsGuest,
+      },
+    );
+  }, [queryClient]);
 
   const loadProfile = useCallback(async (userId: string): Promise<UserProfile | null> => {
     setIsProfileLoading(true);
@@ -98,12 +156,21 @@ export function AuthProvider({ queryClient, children }: AuthProviderProps) {
     mountedRef.current = true;
 
     const handleUser = (nextUser: AuthUser | null) => {
-      setUser(nextUser);
+      const hadUser = Boolean(userRef.current);
+      userRef.current = nextUser;
+
       if (nextUser) {
+        setUser(nextUser);
         void loadProfile(nextUser.id);
       } else {
+        setUser(null);
         setProfile(null);
         setAuthError(null);
+
+        // If a previously authenticated session was revoked/expired unexpectedly
+        if (hadUser && !isExplicitSignOutRef.current) {
+          handleSessionExpired();
+        }
       }
     };
 
@@ -122,7 +189,7 @@ export function AuthProvider({ queryClient, children }: AuthProviderProps) {
       mountedRef.current = false;
       unsubscribe();
     };
-  }, [loadProfile]);
+  }, [loadProfile, handleSessionExpired]);
 
   const signIn = useCallback(
     async (email: string, password: string) => authRepository.login({ email, password }),
@@ -146,24 +213,36 @@ export function AuthProvider({ queryClient, children }: AuthProviderProps) {
   );
 
   const signOut = useCallback(async () => {
-    // Deactivate this device's push token first, while the session is still
-    // valid (RLS needs auth.uid()). Offline: the service queues the server
-    // update for the next network contact and clears local state now.
+    isExplicitSignOutRef.current = true;
     try {
-      await notificationService.deactivateDevice();
-    } catch {
-      // queued server-side; sign-out proceeds regardless (FR-005 edge case)
-    }
+      // Deactivate this device's push token first, while the session is still
+      // valid (RLS needs auth.uid()). Offline: the service queues the server
+      // update for the next network contact and clears local state now.
+      try {
+        await notificationService.deactivateDevice();
+      } catch {
+        // queued server-side; sign-out proceeds regardless (FR-005 edge case)
+      }
 
-    const result = await authRepository.logout();
-    if (!result.success) {
-      throw new Error(result.error.kind === 'unknown' ? result.error.message : 'Sign out failed.');
+      // Immediately cancel any in-flight queries and purge all server state
+      await queryClient.cancelQueries();
+      queryClient.clear();
+
+      try {
+        await authRepository.logout();
+      } catch {
+        // Tolerates already invalid/expired session state without throwing (FR-008, T052)
+      }
+
+      setUser(null);
+      setProfile(null);
+      setAuthError(null);
+      userRef.current = null;
+    } finally {
+      setTimeout(() => {
+        isExplicitSignOutRef.current = false;
+      }, 500);
     }
-    // Purge ALL customer-scoped server state before the user switch.
-    queryClient.clear();
-    setUser(null);
-    setProfile(null);
-    setAuthError(null);
   }, [queryClient]);
 
   const deleteAccount = useCallback(async () => {
@@ -216,6 +295,7 @@ export function AuthProvider({ queryClient, children }: AuthProviderProps) {
       signOut,
       deleteAccount,
       refreshProfile,
+      notifySessionExpired: handleSessionExpired,
     }),
     [
       user,
@@ -230,6 +310,7 @@ export function AuthProvider({ queryClient, children }: AuthProviderProps) {
       signOut,
       deleteAccount,
       refreshProfile,
+      handleSessionExpired,
     ],
   );
 

@@ -1,4 +1,5 @@
 import { createSelector, createSlice, PayloadAction } from '@reduxjs/toolkit';
+import { MoneyAmount } from '@/shared/types/common';
 import { CartItem } from '../domain/entities/CartItem';
 import { CheckoutIntent } from '../domain/entities/CheckoutIntent';
 import { generateCartItemId } from '../domain/cartUtils';
@@ -191,6 +192,35 @@ export const cartSlice = createSlice({
       state.checkoutIntent = action.payload.checkoutIntent ?? null;
       state.conflictState = initialState.conflictState;
     },
+
+    /**
+     * Updates unit prices for items whose prices changed in the catalog (FR-007).
+     */
+    updateCartItemPrices(
+      state,
+      action: PayloadAction<Array<{ productId: string; newPrice: MoneyAmount }>>,
+    ) {
+      for (const update of action.payload) {
+        for (const item of state.items) {
+          if (item.productId === update.productId) {
+            item.baseUnitPrice = update.newPrice;
+          }
+        }
+      }
+    },
+
+    /**
+     * Removes discontinued or out-of-stock items identified during pre-checkout revalidation.
+     */
+    removeUnavailableItems(state, action: PayloadAction<string[]>) {
+      const unavailableSet = new Set(action.payload);
+      state.items = state.items.filter((item) => !unavailableSet.has(item.productId));
+      if (state.items.length === 0) {
+        state.storeId = null;
+        state.storeName = null;
+        state.checkoutIntent = null;
+      }
+    },
   },
 });
 
@@ -208,6 +238,8 @@ export const {
   hydrateCart,
   setCheckoutIntent,
   clearCheckoutIntent,
+  updateCartItemPrices,
+  removeUnavailableItems,
 } = cartSlice.actions;
 
 // Selectors

@@ -11,9 +11,13 @@ import {
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { SavedDeliveryAddress } from '@/features/addresses/domain/entities/SavedDeliveryAddress';
+import { AddressException } from '@/features/addresses/domain/entities/AddressError';
+import { getAddressErrorMessage } from '@/features/addresses/presentation/messages/addressesErrorMessages.ar';
+import { classifyAddressError } from '@/features/addresses/infrastructure/addressErrorClassifier';
 import { AddressRepository } from '@/features/addresses/domain/repositories/AddressRepository';
 import { SupabaseAddressRepository } from '@/features/addresses/infrastructure/SupabaseAddressRepository';
 import { AddressCard } from '@/features/addresses/presentation/AddressCard';
+import { showAlert } from '@/shared/utils/alert';
 import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
@@ -98,12 +102,21 @@ export default function SavedAddressesScreen() {
       invalidate();
       closeForm();
     },
-    onError: (error: Error) => setFormError(error.message),
+    onError: (error: unknown) => {
+      if (__DEV__) console.error('[SaveAddressError]', error);
+      const addrError = error instanceof AddressException ? error : classifyAddressError(error);
+      setFormError(getAddressErrorMessage(addrError.kind));
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => addressRepository.deleteAddress(id),
     onSuccess: invalidate,
+    onError: (error: unknown) => {
+      if (__DEV__) console.error('[DeleteAddressError]', error);
+      const addrError = error instanceof AddressException ? error : classifyAddressError(error);
+      showAlert('تعذر حذف العنوان', getAddressErrorMessage(addrError.kind));
+    },
   });
 
   function openCreate() {

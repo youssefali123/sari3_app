@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Platform,
   RefreshControl,
@@ -16,6 +17,7 @@ import {
   AppScreen,
   BrandHeader,
   EmptyState,
+  ErrorState,
   LoadingState,
   PrimaryButton,
   Surface,
@@ -28,6 +30,9 @@ import { useAvailableOrders } from '@/features/drivers/application/hooks/useAvai
 import { AvailabilityToggle } from '@/features/drivers/presentation/components/AvailabilityToggle';
 import { AvailableOrderCard } from '@/features/drivers/presentation/components/AvailableOrderCard';
 import { AvailableOrderPreview } from '@/features/drivers/domain/entities/AvailableOrderPreview';
+import { DriverException } from '@/features/drivers/domain/entities/DriverError';
+import { getDriverErrorMessage } from '@/features/drivers/presentation/messages/driversErrorMessages.ar';
+import { classifyDriverError } from '@/features/drivers/infrastructure/driverErrorClassifier';
 
 const NOT_AVAILABLE_MESSAGE = 'تم قبول هذا الطلب من قبل سائق آخر أو تم إلغاؤه.';
 
@@ -89,8 +94,23 @@ export default function AvailableOrdersScreen() {
       } else {
         setLostRaceOrderId(orderId);
       }
-    } catch {
-      // Errors surface through the hook's `error`.
+    } catch (err) {
+      if (__DEV__) console.error('[QuickClaimError]', err);
+      const driverError =
+        err instanceof DriverException ? err : classifyDriverError(err);
+      if (driverError.kind === 'driver_already_has_active_order') {
+        Alert.alert(
+          'طلب نشط قيد التنفيذ',
+          'لديك طلب نشط بالفعل قيد التنفيذ.',
+          [
+            {
+              text: 'عرض الطلب النشط',
+              onPress: () => router.replace('/(driver)/active-order'),
+            },
+          ],
+          { cancelable: true },
+        );
+      }
     }
   };
 
@@ -154,6 +174,15 @@ export default function AvailableOrdersScreen() {
         </View>
       ) : poolLoading ? (
         <LoadingState />
+      ) : error && orders.length === 0 ? (
+        <View style={styles.centerContainer}>
+          <ErrorState
+            title="تعذر تحميل الطلبات المتاحة"
+            message={getDriverErrorMessage(classifyDriverError(error).kind)}
+            isOffline={classifyDriverError(error).kind === 'network_error'}
+            onRetry={() => void handleRefresh()}
+          />
+        </View>
       ) : orders.length === 0 ? (
         <ScrollView
           style={styles.pool}
@@ -206,7 +235,11 @@ export default function AvailableOrdersScreen() {
           ListFooterComponent={
             error ? (
               <Text style={[styles.errorText, { color: colors.destructive }]}>
-                {error.message}
+                {getDriverErrorMessage(
+                  error instanceof DriverException
+                    ? error.kind
+                    : classifyDriverError(error).kind,
+                )}
               </Text>
             ) : null
           }

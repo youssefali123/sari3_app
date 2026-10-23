@@ -13,6 +13,8 @@ import {
 import { useDriverHistory } from '@/features/drivers/application/hooks/useDriverHistory';
 import { DeliveryHistoryCard } from '@/features/drivers/presentation/components/DeliveryHistoryCard';
 import { DeliveryHistoryEntry } from '@/features/drivers/domain/entities/DeliveryHistoryEntry';
+import { classifyDriverError } from '@/features/drivers/infrastructure/driverErrorClassifier';
+import { getDriverErrorMessage } from '@/features/drivers/presentation/messages/driversErrorMessages.ar';
 
 /**
  * Newest-first delivery history: completed, declined, released, and cancelled.
@@ -56,7 +58,7 @@ export default function DriverHistoryScreen() {
         <View style={styles.centerContainer}>
           <ErrorState
             title="تعذر تحميل السجل"
-            message={error.message}
+            message={getDriverErrorMessage(classifyDriverError(error).kind)}
             onRetry={() => void refetch()}
           />
         </View>

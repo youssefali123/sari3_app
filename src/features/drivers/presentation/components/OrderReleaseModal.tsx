@@ -11,6 +11,8 @@ import { useColors, useTheme } from '@/shared/ui/theme';
 import { Icon } from '@/shared/ui/components/Icon';
 import { PrimaryButton } from '@/shared/ui/components/AppUI';
 import { SwipeableBottomSheetModal } from '@/shared/ui/components/SwipeableBottomSheetModal';
+import { classifyDriverError } from '../../infrastructure/driverErrorClassifier';
+import { getDriverErrorMessage } from '../messages/driversErrorMessages.ar';
 
 interface OrderReleaseModalProps {
   visible: boolean;
@@ -141,7 +143,7 @@ export function OrderReleaseModal({
                 },
               ]}
             >
-              {error.message}
+              {getDriverErrorMessage(classifyDriverError(error).kind)}
             </Text>
           ) : null}
 

@@ -11,6 +11,10 @@ import { useCurrentCustomerId } from '@/shared/lib/auth';
 import { useAuth } from '@/features/auth/application/hooks/useAuth';
 import { useRequireAuth } from '@/features/auth/presentation/hooks/useRequireAuth';
 import { ErrorView } from '@/shared/ui/components/ErrorView';
+import { ErrorState } from '@/shared/ui/components/ErrorState';
+import { OrderException } from '@/features/orders/domain/entities/OrderError';
+import { getOrderErrorMessage } from '@/features/orders/presentation/messages/ordersErrorMessages.ar';
+import { classifyOrderError } from '@/features/orders/infrastructure/orderErrorClassifier';
 import { SkeletonOrderCard } from '@/shared/ui/motion';
 import { AppScreen, BrandHeader, EmptyState } from '@/shared/ui/components/AppUI';
 import { AuthRequiredView } from '@/shared/ui/components/AuthRequiredModal';
@@ -38,6 +42,8 @@ export default function OrderHistoryScreen() {
     data: orders = [],
     isLoading,
     isError,
+    error,
+    fetchStatus,
     refetch,
   } = useQuery({
     queryKey: ['orders', customerId],
@@ -61,8 +67,10 @@ export default function OrderHistoryScreen() {
     try {
       await orderRepository.hideOrder(orderId);
       queryClient.invalidateQueries({ queryKey: ['orders', customerId] });
-    } catch (error) {
-      showAlert('تعذر إخفاء الطلب', error instanceof Error ? error.message : 'حاول مرة أخرى.');
+    } catch (err) {
+      if (__DEV__) console.error('[HideOrderError]', err);
+      const orderError = err instanceof OrderException ? err : classifyOrderError(err);
+      showAlert('تعذر إخفاء الطلب', getOrderErrorMessage(orderError.kind));
     }
   };
 
@@ -125,11 +133,25 @@ export default function OrderHistoryScreen() {
     );
   }
 
-  if (isError) {
+  if (fetchStatus === 'paused' && orders.length === 0) {
     return (
       <AppScreen>
         <BrandHeader title="طلباتي" subtitle="تابع طلباتك بكل سهولة" />
-        <ErrorView message="تعذر تحميل الطلبات." onRetry={refetch} />
+        <ErrorState isOffline onRetry={refetch} />
+      </AppScreen>
+    );
+  }
+
+  if (isError) {
+    const orderError = error instanceof OrderException ? error : classifyOrderError(error);
+    return (
+      <AppScreen>
+        <BrandHeader title="طلباتي" subtitle="تابع طلباتك بكل سهولة" />
+        <ErrorState
+          title="تعذر تحميل الطلبات"
+          message={getOrderErrorMessage(orderError.kind)}
+          onRetry={refetch}
+        />
       </AppScreen>
     );
   }

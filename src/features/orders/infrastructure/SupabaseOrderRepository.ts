@@ -10,6 +10,7 @@ import {
   OrderRepository,
   PlaceOrderInput,
 } from '../domain/repositories/OrderRepository';
+import { classifyOrderError } from './orderErrorClassifier';
 
 /**
  * Centralized camelCase → snake_case mapping for add-on id arrays, shared by
@@ -126,138 +127,158 @@ export class SupabaseOrderRepository implements OrderRepository {
       items: toRpcItems(input.items),
     };
 
-    const { data, error } = await supabase.rpc('place_order', { p_payload });
-    if (error) throw new Error(error.message);
+    try {
+      const { data, error } = await supabase.rpc('place_order', { p_payload });
+      if (error) throw error;
 
-    const payload = data as {
-      id: string;
-      customerId: string;
-      driverId: string | null;
-      storeId: string;
-      storeName: string;
-      status: OrderStatus;
-      deliveryAddressSnapshot: string;
-      deliveryAddressLabel: string | null;
-      paymentMethod: PaymentMethod;
-      couponCode: string | null;
-      discountAmount: number | string;
-      subtotalAmount: number | string;
-      deliveryFee: number | string;
-      totalAmount: number | string;
-      idempotencyKey?: string | null;
-      createdAt: string;
-      acceptedAt: string | null;
-      deliveredAt: string | null;
-      updatedAt: string;
-      items: {
+      const payload = data as {
         id: string;
-        orderId: string;
-        productId: string;
-        productName: string;
-        variantName: string | null;
-        unitPrice: number | string;
-        quantity: number | string;
-        subtotal: number | string;
-        addonSnapshots: unknown;
-      }[];
-    };
+        customerId: string;
+        driverId: string | null;
+        storeId: string;
+        storeName: string;
+        status: OrderStatus;
+        deliveryAddressSnapshot: string;
+        deliveryAddressLabel: string | null;
+        paymentMethod: PaymentMethod;
+        couponCode: string | null;
+        discountAmount: number | string;
+        subtotalAmount: number | string;
+        deliveryFee: number | string;
+        totalAmount: number | string;
+        idempotencyKey?: string | null;
+        createdAt: string;
+        acceptedAt: string | null;
+        deliveredAt: string | null;
+        updatedAt: string;
+        items: {
+          id: string;
+          orderId: string;
+          productId: string;
+          productName: string;
+          variantName: string | null;
+          unitPrice: number | string;
+          quantity: number | string;
+          subtotal: number | string;
+          addonSnapshots: unknown;
+        }[];
+      };
 
-    return {
-      id: payload.id,
-      customerId: payload.customerId,
-      driverId: payload.driverId,
-      storeId: payload.storeId,
-      storeName: payload.storeName,
-      status: payload.status,
-      deliveryAddressSnapshot: payload.deliveryAddressSnapshot,
-      deliveryAddressLabel: payload.deliveryAddressLabel,
-      paymentMethod: payload.paymentMethod,
-      couponCode: payload.couponCode,
-      discountAmount: Number(payload.discountAmount),
-      subtotalAmount: Number(payload.subtotalAmount),
-      deliveryFee: Number(payload.deliveryFee),
-      totalAmount: Number(payload.totalAmount),
-      items: payload.items.map((item) => ({
-        id: item.id,
-        orderId: item.orderId,
-        productId: item.productId,
-        productName: item.productName,
-        variantName: item.variantName,
-        unitPrice: Number(item.unitPrice),
-        quantity: Number(item.quantity),
-        subtotal: Number(item.subtotal),
-        addonSnapshots: mapAddOnSnapshots(item.addonSnapshots),
-      })),
-      createdAt: payload.createdAt,
-      acceptedAt: payload.acceptedAt,
-      deliveredAt: payload.deliveredAt,
-      updatedAt: payload.updatedAt,
-      idempotencyKey: payload.idempotencyKey ?? null,
-      // place_order creates fresh, visible orders
-      customerHiddenAt: null,
-    };
+      return {
+        id: payload.id,
+        customerId: payload.customerId,
+        driverId: payload.driverId,
+        storeId: payload.storeId,
+        storeName: payload.storeName,
+        status: payload.status,
+        deliveryAddressSnapshot: payload.deliveryAddressSnapshot,
+        deliveryAddressLabel: payload.deliveryAddressLabel,
+        paymentMethod: payload.paymentMethod,
+        couponCode: payload.couponCode,
+        discountAmount: Number(payload.discountAmount),
+        subtotalAmount: Number(payload.subtotalAmount),
+        deliveryFee: Number(payload.deliveryFee),
+        totalAmount: Number(payload.totalAmount),
+        items: (payload.items ?? []).map((it) => ({
+          id: it.id,
+          orderId: it.orderId,
+          productId: it.productId,
+          productName: it.productName,
+          variantName: it.variantName,
+          unitPrice: Number(it.unitPrice),
+          quantity: Number(it.quantity),
+          subtotal: Number(it.subtotal),
+          addonSnapshots: mapAddOnSnapshots(it.addonSnapshots),
+        })),
+        createdAt: payload.createdAt,
+        acceptedAt: payload.acceptedAt,
+        deliveredAt: payload.deliveredAt,
+        updatedAt: payload.updatedAt,
+        idempotencyKey: payload.idempotencyKey ?? null,
+        // place_order creates fresh, visible orders
+        customerHiddenAt: null,
+      };
+    } catch (err) {
+      throw classifyOrderError(err);
+    }
   }
 
   async getOrderById(id: string): Promise<Order> {
-    const { data: orderData, error: orderError } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('id', id)
-      .single();
-    if (orderError) throw new Error(orderError.message);
+    try {
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('id', id)
+        .single();
+      if (orderError) throw orderError;
 
-    const { data: itemsData, error: itemsError } = await supabase
-      .from('order_items')
-      .select('*')
-      .eq('order_id', id);
-    if (itemsError) throw new Error(itemsError.message);
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', id);
+      if (itemsError) throw itemsError;
 
-    return mapOrder(
-      orderData as OrderRow,
-      (itemsData ?? []).map(mapOrderItem),
-    );
+      return mapOrder(
+        orderData as OrderRow,
+        (itemsData ?? []).map(mapOrderItem),
+      );
+    } catch (err) {
+      throw classifyOrderError(err);
+    }
   }
 
   async getCustomerOrders(customerId: string): Promise<Order[]> {
-    const { data: ordersData, error: ordersError } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('customer_id', customerId)
-      .is('customer_hidden_at', null)
-      .order('created_at', { ascending: false });
-    if (ordersError) throw new Error(ordersError.message);
+    try {
+      const { data: ordersData, error: ordersError } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('customer_id', customerId)
+        .is('customer_hidden_at', null)
+        .order('created_at', { ascending: false });
+      if (ordersError) throw ordersError;
 
-    const rows = (ordersData ?? []) as OrderRow[];
-    if (rows.length === 0) return [];
+      const rows = (ordersData ?? []) as OrderRow[];
+      if (rows.length === 0) return [];
 
-    const { data: itemsData, error: itemsError } = await supabase
-      .from('order_items')
-      .select('*')
-      .in(
-        'order_id',
-        rows.map((r) => r.id),
-      );
-    if (itemsError) throw new Error(itemsError.message);
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .in(
+          'order_id',
+          rows.map((r) => r.id),
+        );
+      if (itemsError) throw itemsError;
 
-    const itemsByOrder = new Map<string, OrderItemSnapshot[]>();
-    for (const item of (itemsData ?? []) as OrderItemRow[]) {
-      const key = item.order_id ?? '';
-      const list = itemsByOrder.get(key) ?? [];
-      list.push(mapOrderItem(item));
-      itemsByOrder.set(key, list);
+      const itemsByOrder = new Map<string, OrderItemSnapshot[]>();
+      for (const item of (itemsData ?? []) as OrderItemRow[]) {
+        const key = item.order_id ?? '';
+        const list = itemsByOrder.get(key) ?? [];
+        list.push(mapOrderItem(item));
+        itemsByOrder.set(key, list);
+      }
+
+      return rows.map((row) => mapOrder(row, itemsByOrder.get(row.id) ?? []));
+    } catch (err) {
+      throw classifyOrderError(err);
     }
-
-    return rows.map((row) => mapOrder(row, itemsByOrder.get(row.id) ?? []));
   }
 
   async cancelOrder(orderId: string): Promise<Order> {
-    const { error } = await supabase.rpc('cancel_order', { p_order_id: orderId });
-    if (error) throw new Error(error.message);
-    return this.getOrderById(orderId);
+    try {
+      const { error } = await supabase.rpc('cancel_order', { p_order_id: orderId });
+      if (error) throw error;
+      return await this.getOrderById(orderId);
+    } catch (err) {
+      throw classifyOrderError(err);
+    }
   }
 
   async hideOrder(orderId: string): Promise<void> {
-    const { error } = await supabase.rpc('hide_order', { p_order_id: orderId });
-    if (error) throw new Error(error.message);
+    try {
+      const { error } = await supabase.rpc('hide_order', { p_order_id: orderId });
+      if (error) throw error;
+    } catch (err) {
+      throw classifyOrderError(err);
+    }
   }
 }

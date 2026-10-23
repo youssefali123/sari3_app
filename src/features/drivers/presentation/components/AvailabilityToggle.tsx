@@ -3,6 +3,8 @@ import { ActivityIndicator, StyleSheet, Switch, Text, View } from 'react-native'
 import { useColors, useTheme } from '@/shared/ui/theme';
 import { Surface } from '@/shared/ui/components/AppUI';
 import { useDriverAvailability } from '../../application/hooks/useDriverAvailability';
+import { classifyDriverError } from '../../infrastructure/driverErrorClassifier';
+import { getDriverErrorMessage } from '../messages/driversErrorMessages.ar';
 
 /**
  * Available / Offline switch bound to the driver's server-side availability.
@@ -85,7 +87,7 @@ export function AvailabilityToggle() {
             },
           ]}
         >
-          {error.message}
+          {getDriverErrorMessage(classifyDriverError(error).kind)}
         </Text>
       ) : null}
     </View>

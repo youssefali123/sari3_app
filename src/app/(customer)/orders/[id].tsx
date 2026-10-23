@@ -19,6 +19,10 @@ import { ConfirmDialog } from '@/shared/ui/components/ConfirmDialog';
 import { showAlert } from '@/shared/utils/alert';
 import { useColors, useTheme } from '@/shared/ui/theme';
 import { AppScreen, BrandHeader, EmptyState, PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
+import { ErrorState } from '@/shared/ui/components/ErrorState';
+import { OrderException } from '@/features/orders/domain/entities/OrderError';
+import { getOrderErrorMessage } from '@/features/orders/presentation/messages/ordersErrorMessages.ar';
+import { classifyOrderError } from '@/features/orders/infrastructure/orderErrorClassifier';
 import { AuthRequiredView } from '@/shared/ui/components/AuthRequiredModal';
 import { Icon } from '@/shared/ui/components/Icon';
 import { formatCurrency, formatDateTime } from '@/shared/utils/formatting';
@@ -76,11 +80,13 @@ export default function OrderDetailScreen() {
     data: order,
     isLoading,
     isError,
+    error,
+    fetchStatus,
     refetch,
   } = useQuery({
     queryKey: ['order', orderId],
     queryFn: () => orderRepository.getOrderById(orderId),
-    enabled: Boolean(orderId),
+    enabled: Boolean(orderId) && Boolean(user),
   });
 
   const isActive = order ? !TERMINAL_STATUSES.includes(order.status) : false;
@@ -90,7 +96,7 @@ export default function OrderDetailScreen() {
   const { data: driverInfo } = useQuery({
     queryKey: ['orderDriverInfo', orderId],
     queryFn: () => driverInfoService.getOrderDriverInfo(orderId),
-    enabled: Boolean(orderId) && isActive,
+    enabled: Boolean(orderId) && Boolean(user) && isActive,
   });
 
   useEffect(() => {
@@ -108,8 +114,21 @@ export default function OrderDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ['order', orderId] });
       queryClient.invalidateQueries({ queryKey: ['orders'] });
     },
-    onError: (error: Error) => {
-      showAlert('تعذر إلغاء الطلب', error.message);
+    onError: (err: unknown) => {
+      if (__DEV__) console.error('[CancelOrderError]', err);
+      const orderError = err instanceof OrderException ? err : classifyOrderError(err);
+
+      // FR-011 / T034: State-changed conflicts after a lost response
+      if (
+        orderError.kind === 'order_cannot_be_cancelled' ||
+        orderError.kind === 'order_state_changed'
+      ) {
+        queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        return;
+      }
+
+      showAlert('تعذر إلغاء الطلب', getOrderErrorMessage(orderError.kind));
     },
   });
 
@@ -118,8 +137,10 @@ export default function OrderDetailScreen() {
       await orderRepository.hideOrder(orderId);
       queryClient.invalidateQueries({ queryKey: ['orders'] });
       router.replace('/(customer)/orders');
-    } catch (error) {
-      showAlert('تعذر إخفاء الطلب', error instanceof Error ? error.message : 'حاول مرة أخرى.');
+    } catch (err) {
+      if (__DEV__) console.error('[HideOrderError]', err);
+      const orderError = err instanceof OrderException ? err : classifyOrderError(err);
+      showAlert('تعذر إخفاء الطلب', getOrderErrorMessage(orderError.kind));
     }
   };
 
@@ -146,18 +167,25 @@ export default function OrderDetailScreen() {
     );
   }
 
-  if (isError || !order) {
+  if (fetchStatus === 'paused' && !order) {
     return (
       <AppScreen>
         <BrandHeader title="تفاصيل الطلب" onBack={() => router.back()} />
-        <View style={styles.errorContent}>
-          <EmptyState
-            title="تعذر العثور على الطلب"
-            message="الطلب غير موجود أو حدث خطأ أثناء جلبه."
-            icon="receipt-outline"
-          />
-          <PrimaryButton title="حاول مرة أخرى" onPress={() => void refetch()} />
-        </View>
+        <ErrorState isOffline onRetry={refetch} />
+      </AppScreen>
+    );
+  }
+
+  if (isError || !order) {
+    const orderError = error instanceof OrderException ? error : classifyOrderError(error);
+    return (
+      <AppScreen>
+        <BrandHeader title="تفاصيل الطلب" onBack={() => router.back()} />
+        <ErrorState
+          title="تعذر تحميل تفاصيل الطلب"
+          message={getOrderErrorMessage(orderError.kind)}
+          onRetry={refetch}
+        />
       </AppScreen>
     );
   }

@@ -21,6 +21,7 @@ export class SupabaseOrderRealtimeService implements OrderRealtimeService {
     orderId: string,
     callback: (status: OrderStatus) => void,
   ): Unsubscribe {
+    let hasConnectedOnce = false;
     const channel = supabase
       .channel(`order-status-${orderId}-${++channelSeq}`)
       .on(
@@ -42,7 +43,15 @@ export class SupabaseOrderRealtimeService implements OrderRealtimeService {
           );
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          if (hasConnectedOnce) {
+            // Reconnected after a drop! Refetch to sync any missed events.
+            void queryClient.invalidateQueries({ queryKey: ['order', orderId] });
+          }
+          hasConnectedOnce = true;
+        }
+      });
 
     return () => {
       void supabase.removeChannel(channel);
@@ -50,6 +59,7 @@ export class SupabaseOrderRealtimeService implements OrderRealtimeService {
   }
 
   subscribeToAvailableOrders(callback: (orders: Order[]) => void): Unsubscribe {
+    let hasConnectedOnce = false;
     const channel = supabase
       .channel(`available-orders-${++channelSeq}`)
       .on(
@@ -67,7 +77,14 @@ export class SupabaseOrderRealtimeService implements OrderRealtimeService {
           if (cached) callback(cached);
         },
       )
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          if (hasConnectedOnce) {
+            void queryClient.invalidateQueries({ queryKey: ['availableOrders'] });
+          }
+          hasConnectedOnce = true;
+        }
+      });
 
     return () => {
       void supabase.removeChannel(channel);

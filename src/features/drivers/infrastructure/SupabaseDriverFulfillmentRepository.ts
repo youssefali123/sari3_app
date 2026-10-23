@@ -13,6 +13,7 @@ import {
   ClaimOrderResult,
   DriverFulfillmentRepository,
 } from '../domain/repositories/DriverFulfillmentRepository';
+import { classifyDriverError } from './driverErrorClassifier';
 
 const ACTIVE_STATUSES = ['accepted', 'preparing', 'out_for_delivery'] as const;
 
@@ -77,6 +78,7 @@ interface OrderRow {
   accepted_at: string | null;
   delivered_at: string | null;
   updated_at: string | null;
+  idempotency_key?: string | null;
   customer_hidden_at?: string | null;
 }
 
@@ -97,6 +99,7 @@ function mapOrder(row: OrderRow, items: OrderItemSnapshot[]): Order {
     deliveryFee: Number(row.delivery_fee),
     totalAmount: Number(row.total_amount),
     items,
+    idempotencyKey: row.idempotency_key ?? null,
     createdAt: row.created_at ?? '',
     acceptedAt: row.accepted_at,
     deliveredAt: row.delivered_at,
@@ -110,15 +113,15 @@ async function fetchOrderWithItems(orderId: string): Promise<Order | null> {
     .from('orders')
     .select('*')
     .eq('id', orderId)
-    .maybeSingle();
-  if (orderError) throw new Error(orderError.message);
+    .single();
+  if (orderError) throw classifyDriverError(orderError);
   if (!orderData) return null;
 
   const { data: itemsData, error: itemsError } = await supabase
     .from('order_items')
     .select('*')
     .eq('order_id', orderId);
-  if (itemsError) throw new Error(itemsError.message);
+  if (itemsError) throw classifyDriverError(itemsError);
 
   return mapOrder(
     orderData as OrderRow,
@@ -130,145 +133,181 @@ export class SupabaseDriverFulfillmentRepository
   implements DriverFulfillmentRepository
 {
   async toggleAvailability(isAvailable: boolean): Promise<boolean> {
-    const { data, error } = await supabase.rpc('toggle_driver_availability', {
-      p_is_available: isAvailable,
-    });
-    if (error) throw new Error(error.message);
-    return Boolean((data as { is_available?: boolean })?.is_available);
+    try {
+      const { data, error } = await supabase.rpc('toggle_driver_availability', {
+        p_is_available: isAvailable,
+      });
+      if (error) throw classifyDriverError(error);
+      return Boolean((data as { is_available?: boolean })?.is_available);
+    } catch (err) {
+      throw classifyDriverError(err);
+    }
   }
 
   async getAvailability(): Promise<boolean> {
-    const user = await this.requireUser();
-    const { data, error } = await supabase
-      .from('driver_profiles')
-      .select('is_available')
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    return Boolean(data?.is_available);
+    try {
+      const user = await this.requireUser();
+      const { data, error } = await supabase
+        .from('driver_profiles')
+        .select('is_available')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (error) throw classifyDriverError(error);
+      return Boolean(data?.is_available);
+    } catch (err) {
+      throw classifyDriverError(err);
+    }
   }
 
   async getAvailableOrders(): Promise<AvailableOrderPreview[]> {
-    const { data, error } = await supabase.rpc('get_available_orders');
-    if (error) throw new Error(error.message);
+    try {
+      const { data, error } = await supabase.rpc('get_available_orders');
+      if (error) throw classifyDriverError(error);
 
-    const rows = (Array.isArray(data) ? data : []) as {
-      id: string;
-      storeName: string;
-      storeNeighbourhood: string | null;
-      itemCount: number | string;
-      createdAt: string;
-    }[];
+      const rows = (Array.isArray(data) ? data : []) as {
+        id: string;
+        storeName: string;
+        storeNeighbourhood: string | null;
+        itemCount: number | string;
+        createdAt: string;
+      }[];
 
-    return rows.map((row) => ({
-      id: row.id,
-      storeName: row.storeName,
-      storeNeighbourhood: row.storeNeighbourhood ?? '',
-      itemCount: Number(row.itemCount),
-      createdAt: row.createdAt,
-    }));
+      return rows.map((row) => ({
+        id: row.id,
+        storeName: row.storeName,
+        storeNeighbourhood: row.storeNeighbourhood ?? '',
+        itemCount: Number(row.itemCount),
+        createdAt: row.createdAt,
+      }));
+    } catch (err) {
+      throw classifyDriverError(err);
+    }
   }
 
   async claimOrder(orderId: string): Promise<ClaimOrderResult> {
-    const user = await this.requireUser();
-    const { data, error } = await supabase.rpc('claim_order', {
-      p_order_id: orderId,
-      p_driver_id: user.id,
-    });
-    if (error) throw new Error(error.message);
+    try {
+      const user = await this.requireUser();
+      const { data, error } = await supabase.rpc('claim_order', {
+        p_order_id: orderId,
+        p_driver_id: user.id,
+      });
+      if (error) throw classifyDriverError(error);
 
-    const payload = data as { claimed: boolean; order: OrderRow | null };
-    if (!payload.claimed || !payload.order) {
-      return { claimed: false, order: null };
-    }
+      const payload = data as { claimed: boolean; order: OrderRow | null };
+      if (!payload.claimed || !payload.order) {
+        return { claimed: false, order: null };
+      }
 
-    // claim_order returns the bare orders row; the full Order (with item
-    // snapshots) is read through the normal RLS-visible path.
-    const order = await fetchOrderWithItems(payload.order.id);
-    if (!order) {
-      throw new Error('Claimed order could not be read back');
+      // claim_order returns the bare orders row; the full Order (with item
+      // snapshots) is read through the normal RLS-visible path.
+      const order = await fetchOrderWithItems(payload.order.id);
+      if (!order) {
+        throw classifyDriverError(new Error('Claimed order could not be read back'));
+      }
+      return { claimed: true, order };
+    } catch (err) {
+      throw classifyDriverError(err);
     }
-    return { claimed: true, order };
   }
 
   async declineOrder(orderId: string): Promise<void> {
-    const { error } = await supabase.rpc('decline_order', {
-      p_order_id: orderId,
-    });
-    if (error) throw new Error(error.message);
+    try {
+      const { error } = await supabase.rpc('decline_order', {
+        p_order_id: orderId,
+      });
+      if (error) throw classifyDriverError(error);
+    } catch (err) {
+      throw classifyDriverError(err);
+    }
   }
 
   async advanceOrderStatus(orderId: string): Promise<AdvanceOrderResult> {
-    const { data, error } = await supabase.rpc('advance_order_status', {
-      p_order_id: orderId,
-    });
-    if (error) throw new Error(error.message);
-    const payload = data as {
-      success?: boolean;
-      new_status?: string;
-      error?: string;
-      message?: string;
-    };
-    return {
-      success: Boolean(payload?.success),
-      newStatus: payload?.new_status,
-      error: payload?.error,
-      message: payload?.message,
-    };
+    try {
+      const { data, error } = await supabase.rpc('advance_order_status', {
+        p_order_id: orderId,
+      });
+      if (error) throw classifyDriverError(error);
+      const payload = data as {
+        success?: boolean;
+        new_status?: string;
+        error?: string;
+        message?: string;
+      };
+      return {
+        success: Boolean(payload?.success),
+        newStatus: payload?.new_status,
+        error: payload?.error,
+        message: payload?.message,
+      };
+    } catch (err) {
+      throw classifyDriverError(err);
+    }
   }
 
   async releaseOrder(orderId: string, reason: string): Promise<void> {
     if (reason.trim() === '') {
-      throw new Error('RELEASE_REASON_REQUIRED');
+      throw classifyDriverError(new Error('RELEASE_REASON_REQUIRED'));
     }
-    const { error } = await supabase.rpc('release_order', {
-      p_order_id: orderId,
-      p_reason: reason.trim(),
-    });
-    if (error) throw new Error(error.message);
+    try {
+      const { error } = await supabase.rpc('release_order', {
+        p_order_id: orderId,
+        p_reason: reason.trim(),
+      });
+      if (error) throw classifyDriverError(error);
+    } catch (err) {
+      throw classifyDriverError(err);
+    }
   }
 
   async getActiveOrder(): Promise<Order | null> {
-    const user = await this.requireUser();
-    const { data, error } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('driver_id', user.id)
-      .in('status', [...ACTIVE_STATUSES])
-      .maybeSingle();
-    if (error) throw new Error(error.message);
-    if (!data) return null;
-    return fetchOrderWithItems(data.id);
+    try {
+      const user = await this.requireUser();
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('driver_id', user.id)
+        .in('status', [...ACTIVE_STATUSES])
+        .maybeSingle();
+      if (error) throw classifyDriverError(error);
+      if (!data) return null;
+      return fetchOrderWithItems(data.id);
+    } catch (err) {
+      throw classifyDriverError(err);
+    }
   }
 
   async getDeliveryHistory(): Promise<DeliveryHistoryEntry[]> {
-    const { data, error } = await supabase.rpc('get_driver_history');
-    if (error) throw new Error(error.message);
+    try {
+      const { data, error } = await supabase.rpc('get_driver_history');
+      if (error) throw classifyDriverError(error);
 
-    const rows = (Array.isArray(data) ? data : []) as {
-      id: string;
-      order_id: string;
-      store_name: string;
-      order_date: string;
-      final_status: DeliveryHistoryEntry['finalStatus'];
-      release_reason: string | null;
-    }[];
+      const rows = (Array.isArray(data) ? data : []) as {
+        id: string;
+        order_id: string;
+        store_name: string;
+        order_date: string;
+        final_status: DeliveryHistoryEntry['finalStatus'];
+        release_reason: string | null;
+      }[];
 
-    return rows.map((row) => ({
-      id: row.id,
-      orderId: row.order_id,
-      storeName: row.store_name,
-      orderDate: row.order_date,
-      finalStatus: row.final_status,
-      releaseReason: row.release_reason,
-    }));
+      return rows.map((row) => ({
+        id: row.id,
+        orderId: row.order_id,
+        storeName: row.store_name,
+        orderDate: row.order_date,
+        finalStatus: row.final_status,
+        releaseReason: row.release_reason,
+      }));
+    } catch (err) {
+      throw classifyDriverError(err);
+    }
   }
 
   private async requireUser() {
     const {
       data: { user },
     } = await supabase.auth.getUser();
-    if (!user) throw new Error('NOT_AUTHENTICATED');
+    if (!user) throw classifyDriverError(new Error('NOT_AUTHENTICATED'));
     return user;
   }
 }

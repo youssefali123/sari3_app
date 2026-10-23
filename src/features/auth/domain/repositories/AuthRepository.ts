@@ -18,6 +18,7 @@ export type AuthErrorType =
   | { kind: 'email_not_confirmed' }
   | { kind: 'invalid_confirmation_code' }
   | { kind: 'active_orders_exist'; message: string }
+  | { kind: 'session_expired' }
   | { kind: 'network_error' }
   | { kind: 'unknown'; message: string };
 
@@ -40,7 +41,7 @@ export interface AuthRepository {
   /** Permanently deletes the authenticated user's account and all associated data. */
   deleteAccount(): Promise<AuthResult<void>>;
   getSession(): Promise<{ user: AuthUser | null }>;
-  onAuthStateChange(callback: (user: AuthUser | null) => void): () => void;
+  onAuthStateChange(callback: (user: AuthUser | null, event?: string) => void): () => void;
 }
 
 export type { AuthUser, UserRole };

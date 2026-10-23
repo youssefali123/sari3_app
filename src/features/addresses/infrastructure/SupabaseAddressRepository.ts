@@ -5,6 +5,7 @@ import {
   CreateAddressInput,
   UpdateAddressInput,
 } from '../domain/repositories/AddressRepository';
+import { classifyAddressError } from './addressErrorClassifier';
 
 interface AddressRow {
   id: string;
@@ -34,78 +35,98 @@ function mapAddress(row: AddressRow): SavedDeliveryAddress {
  */
 export class SupabaseAddressRepository implements AddressRepository {
   async getAddresses(customerId: string): Promise<SavedDeliveryAddress[]> {
-    const { data, error } = await supabase
-      .from('saved_addresses')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('is_default', { ascending: false })
-      .order('created_at');
-    if (error) throw new Error(error.message);
-    return (data ?? []).map(mapAddress);
+    try {
+      const { data, error } = await supabase
+        .from('saved_addresses')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('is_default', { ascending: false })
+        .order('created_at');
+      if (error) throw classifyAddressError(error);
+      return (data ?? []).map(mapAddress);
+    } catch (err) {
+      throw classifyAddressError(err);
+    }
   }
 
   async createAddress(
     customerId: string,
     input: CreateAddressInput,
   ): Promise<SavedDeliveryAddress> {
-    if (input.isDefault) {
-      await this.clearDefaultFor(customerId);
+    try {
+      if (input.isDefault) {
+        await this.clearDefaultFor(customerId);
+      }
+      const { data, error } = await supabase
+        .from('saved_addresses')
+        .insert({
+          customer_id: customerId,
+          label: input.label,
+          address_text: input.addressText,
+          is_default: input.isDefault ?? false,
+        })
+        .select('*')
+        .single();
+      if (error) throw classifyAddressError(error);
+      return mapAddress(data as AddressRow);
+    } catch (err) {
+      throw classifyAddressError(err);
     }
-    const { data, error } = await supabase
-      .from('saved_addresses')
-      .insert({
-        customer_id: customerId,
-        label: input.label,
-        address_text: input.addressText,
-        is_default: input.isDefault ?? false,
-      })
-      .select('*')
-      .single();
-    if (error) throw new Error(error.message);
-    return mapAddress(data as AddressRow);
   }
 
   async updateAddress(id: string, input: UpdateAddressInput): Promise<SavedDeliveryAddress> {
-    if (input.isDefault) {
-      const { data: existing } = await supabase
-        .from('saved_addresses')
-        .select('customer_id')
-        .eq('id', id)
-        .single();
-      if (existing) {
-        await this.clearDefaultFor(existing.customer_id, id);
+    try {
+      if (input.isDefault) {
+        const { data: existing } = await supabase
+          .from('saved_addresses')
+          .select('customer_id')
+          .eq('id', id)
+          .single();
+        if (existing) {
+          await this.clearDefaultFor(existing.customer_id, id);
+        }
       }
-    }
 
-    const { data, error } = await supabase
-      .from('saved_addresses')
-      .update({
-        ...(input.label !== undefined ? { label: input.label } : {}),
-        ...(input.addressText !== undefined ? { address_text: input.addressText } : {}),
-        ...(input.isDefault !== undefined ? { is_default: input.isDefault } : {}),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select('*')
-      .single();
-    if (error) throw new Error(error.message);
-    return mapAddress(data as AddressRow);
+      const { data, error } = await supabase
+        .from('saved_addresses')
+        .update({
+          ...(input.label !== undefined ? { label: input.label } : {}),
+          ...(input.addressText !== undefined ? { address_text: input.addressText } : {}),
+          ...(input.isDefault !== undefined ? { is_default: input.isDefault } : {}),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select('*')
+        .single();
+      if (error) throw classifyAddressError(error);
+      return mapAddress(data as AddressRow);
+    } catch (err) {
+      throw classifyAddressError(err);
+    }
   }
 
   async deleteAddress(id: string): Promise<void> {
-    const { error } = await supabase.from('saved_addresses').delete().eq('id', id);
-    if (error) throw new Error(error.message);
+    try {
+      const { error } = await supabase.from('saved_addresses').delete().eq('id', id);
+      if (error) throw classifyAddressError(error);
+    } catch (err) {
+      throw classifyAddressError(err);
+    }
   }
 
   private async clearDefaultFor(customerId: string, exceptId?: string): Promise<void> {
-    let query = supabase
-      .from('saved_addresses')
-      .update({ is_default: false })
-      .eq('customer_id', customerId);
-    if (exceptId) {
-      query = query.neq('id', exceptId);
+    try {
+      let query = supabase
+        .from('saved_addresses')
+        .update({ is_default: false })
+        .eq('customer_id', customerId);
+      if (exceptId) {
+        query = query.neq('id', exceptId);
+      }
+      const { error } = await query;
+      if (error) throw classifyAddressError(error);
+    } catch (err) {
+      throw classifyAddressError(err);
     }
-    const { error } = await query;
-    if (error) throw new Error(error.message);
   }
 }

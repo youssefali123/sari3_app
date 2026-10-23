@@ -16,6 +16,8 @@ import { useNotificationSetup } from '@/features/notifications/application/hooks
 import { AppSplashScreen } from '@/shared/ui/components';
 import { screenTransitions } from '@/shared/ui/motion';
 import { useTheme } from '@/shared/ui/theme';
+import { useCartHydrated } from '@/shared/lib/store';
+export { ErrorBoundary } from '@/shared/ui/components/ErrorBoundary';
 
 // Prevent white flash during native transition: set native root window background immediately
 SystemUI.setBackgroundColorAsync('#1A1915').catch(() => {});
@@ -50,6 +52,7 @@ function RootNavigator() {
   const [minTimeElapsed, setMinTimeElapsed] = useState(false);
   const [safetyTimeoutElapsed, setSafetyTimeoutElapsed] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  const isCartHydrated = useCartHydrated();
 
   // 1. Hide native static splash immediately so AppSplashScreen takes over seamlessly
   useEffect(() => {
@@ -78,10 +81,10 @@ function RootNavigator() {
     }
   }, [fontError]);
 
-  // Essential prerequisites are ready
+  // Essential prerequisites are ready: auth resolved, fonts loaded, and cart hydrated
   const isAppReady =
     safetyTimeoutElapsed ||
-    ((!isLoading || !!authError) && (fontsLoaded || !!fontError));
+    ((!isLoading || !!authError) && (fontsLoaded || !!fontError) && isCartHydrated);
 
   // Dismiss splash when prerequisites are satisfied AND minimum 1.5s time has elapsed
   const canDismissSplash = isAppReady && minTimeElapsed;

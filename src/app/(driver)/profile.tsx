@@ -63,10 +63,10 @@ export default function DriverProfileScreen() {
             try {
               await signOut();
               router.replace('/(customer)/(home)');
-            } catch (error) {
+            } catch {
               Alert.alert(
                 'فشل تسجيل الخروج',
-                error instanceof Error ? error.message : 'يرجى المحاولة مرة أخرى.',
+                'حدث خطأ أثناء تسجيل الخروج. يرجى المحاولة مرة أخرى لاحقاً.',
               );
             }
           },

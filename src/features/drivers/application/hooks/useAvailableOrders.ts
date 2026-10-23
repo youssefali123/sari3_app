@@ -13,6 +13,8 @@ import {
   ACTIVE_ORDER_QUERY_KEY,
   CANCELLED_NOTICE_QUERY_KEY,
 } from './useActiveOrder';
+import { DriverException } from '../../domain/entities/DriverError';
+import { classifyDriverError } from '../../infrastructure/driverErrorClassifier';
 
 const driverFulfillmentRepository: DriverFulfillmentRepository =
   new SupabaseDriverFulfillmentRepository();
@@ -66,7 +68,20 @@ export function useAvailableOrders() {
       if (!isConnected) {
         throw new Error(OFFLINE_ABORT_MESSAGE);
       }
-      return driverFulfillmentRepository.claimOrder(orderId);
+      try {
+        return await driverFulfillmentRepository.claimOrder(orderId);
+      } catch (err) {
+        const driverError =
+          err instanceof DriverException ? err : classifyDriverError(err);
+        // FR-010 / T033: If error is already has active order (23505), inspect active order
+        if (driverError.kind === 'driver_already_has_active_order') {
+          const activeOrder = await driverFulfillmentRepository.getActiveOrder();
+          if (activeOrder && activeOrder.id === orderId) {
+            return { claimed: true, order: activeOrder };
+          }
+        }
+        throw driverError;
+      }
     },
     onSuccess: (result, orderId) => {
       if (result.claimed) {

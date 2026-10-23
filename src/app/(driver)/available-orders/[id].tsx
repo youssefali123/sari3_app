@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   StyleSheet,
   Text,
   View,
@@ -19,6 +20,9 @@ import {
 import { Icon } from '@/shared/ui/components/Icon';
 import { formatDateTime } from '@/shared/utils/formatting';
 import { useAvailableOrders } from '@/features/drivers/application/hooks/useAvailableOrders';
+import { DriverException } from '@/features/drivers/domain/entities/DriverError';
+import { getDriverErrorMessage } from '@/features/drivers/presentation/messages/driversErrorMessages.ar';
+import { classifyDriverError } from '@/features/drivers/infrastructure/driverErrorClassifier';
 
 const NOT_AVAILABLE_MESSAGE = 'هذا الطلب لم يعد متاحاً (تم قبوله من سائق آخر أو تم إلغاؤه).';
 
@@ -44,8 +48,23 @@ export default function AvailableOrderDetailScreen() {
       } else {
         setNotAvailable(true);
       }
-    } catch {
-      // Mutation error surfaces through `error` below.
+    } catch (err) {
+      if (__DEV__) console.error('[AcceptOrderError]', err);
+      const driverError =
+        err instanceof DriverException ? err : classifyDriverError(err);
+      if (driverError.kind === 'driver_already_has_active_order') {
+        Alert.alert(
+          'طلب نشط قيد التنفيذ',
+          'لديك طلب نشط بالفعل قيد التنفيذ.',
+          [
+            {
+              text: 'عرض الطلب النشط',
+              onPress: () => router.replace('/(driver)/active-order'),
+            },
+          ],
+          { cancelable: true },
+        );
+      }
     }
   };
 
@@ -124,7 +143,11 @@ export default function AvailableOrderDetailScreen() {
 
           {error ? (
             <Text style={[styles.errorText, { color: colors.destructive }]}>
-              {error.message}
+              {getDriverErrorMessage(
+                error instanceof DriverException
+                  ? error.kind
+                  : classifyDriverError(error).kind,
+              )}
             </Text>
           ) : null}
 

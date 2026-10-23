@@ -7,29 +7,43 @@ interface ErrorStateProps {
   title?: string;
   message?: string;
   onRetry?: () => void;
+  retryLabel?: string;
+  isOffline?: boolean;
   fullPage?: boolean;
 }
 
 /**
- * Themed error state (feature 009 US1, contracts §15). Fully tokenized.
- * `ErrorView` remains as a re-export alias for backwards compatibility.
+ * Themed Arabic error state component (FR-002, FR-007).
+ * Displays user-friendly Arabic copy and optional retry action.
  */
 export function ErrorState({
-  title = 'Something went wrong',
-  message = 'Please try again.',
+  title,
+  message,
   onRetry,
+  retryLabel = 'إعادة المحاولة',
+  isOffline = false,
   fullPage = false,
 }: ErrorStateProps) {
   const { theme } = useTheme();
   const styles = createStyles(theme);
+
+  const displayTitle =
+    title ?? (isOffline ? 'لا يتوفر اتصال بالإنترنت' : 'حدث خطأ غير متوقع');
+  const displayMessage =
+    message ??
+    (isOffline
+      ? 'يرجى التحقق من اتصالك بالشبكة وإعادة المحاولة لتحديث البيانات.'
+      : 'يرجى المحاولة مرة أخرى لاحقاً.');
+  const icon = isOffline ? '📡' : '⚠️';
+
   return (
     <View style={[styles.container, fullPage && styles.fullPage]}>
-      <Text style={styles.emoji}>⚠️</Text>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.message}>{message}</Text>
+      <Text style={styles.emoji}>{icon}</Text>
+      <Text style={styles.title}>{displayTitle}</Text>
+      <Text style={styles.message}>{displayMessage}</Text>
       {onRetry ? (
         <Button
-          label="Retry"
+          label={retryLabel}
           variant="outlined"
           onPress={onRetry}
           style={styles.retryButton}
@@ -56,6 +70,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     title: {
       ...theme.typography.headingSmall,
       color: theme.colors.textPrimary,
+      textAlign: 'center',
       marginBottom: theme.spacing.sm,
     },
     message: {
@@ -63,6 +78,7 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       color: theme.colors.textSecondary,
       textAlign: 'center',
       marginBottom: theme.spacing.md,
+      maxWidth: 320,
     },
     retryButton: {
       paddingHorizontal: theme.spacing.lg,

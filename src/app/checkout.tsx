@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BackHandler, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, BackHandler, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import * as Crypto from 'expo-crypto';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { OrderException } from '@/features/orders/domain/entities/OrderError';
+import { getOrderErrorMessage } from '@/features/orders/presentation/messages/ordersErrorMessages.ar';
+import { classifyOrderError } from '@/features/orders/infrastructure/orderErrorClassifier';
 import { AddressRepository } from '@/features/addresses/domain/repositories/AddressRepository';
 import { SupabaseAddressRepository } from '@/features/addresses/infrastructure/SupabaseAddressRepository';
 import { AddressSelectionModal } from '@/features/addresses/presentation/AddressSelectionModal';
@@ -40,6 +43,8 @@ import { AppScreen, BrandHeader, PrimaryButton, Surface } from '@/shared/ui/comp
 import { AuthRequiredView } from '@/shared/ui/components/AuthRequiredModal';
 import { showAlert } from '@/shared/utils/alert';
 import { formatCurrencyCompact } from '@/shared/utils/formatting';
+import { useCartRevalidation } from '@/features/cart/application/hooks/useCartRevalidation';
+import { PriceChangeModal } from '@/features/cart/presentation/components/PriceChangeModal';
 
 const addressRepository: AddressRepository = new SupabaseAddressRepository();
 const couponRepository: CouponRepository = new SupabaseCouponRepository();
@@ -93,6 +98,25 @@ export default function CheckoutScreen() {
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [couponRejection, setCouponRejection] = useState<string | null>(null);
 
+  const {
+    revalidate,
+    isRevalidating,
+    lastResult,
+    acceptPriceChanges,
+    removeUnavailable,
+  } = useCartRevalidation();
+  const [priceModalVisible, setPriceModalVisible] = useState(false);
+
+  useEffect(() => {
+    if (storeId && items.length > 0) {
+      void revalidate().then((result) => {
+        if (result.priceDifferences.length > 0) {
+          setPriceModalVisible(true);
+        }
+      });
+    }
+  }, [storeId, revalidate, items.length]);
+
   const { data: addresses, isLoading: addressesLoading } = useQuery({
     queryKey: ['addresses', customerId],
     queryFn: () => addressRepository.getAddresses(customerId!),
@@ -128,12 +152,22 @@ export default function CheckoutScreen() {
       // Single coupon per order: a new code replaces the previous one (BR-004).
       setAppliedCouponCode(result.isValid ? code : null);
       setCouponDiscount(result.isValid ? result.discountAmount : 0);
-      setCouponRejection(
-        result.isValid ? null : (result.rejectionReason ?? 'تعذر تطبيق الكوبون.'),
-      );
+      if (result.isValid) {
+        setCouponRejection(null);
+      } else {
+        const reason = (result.rejectionReason ?? '').toUpperCase();
+        let arReason = 'تعذر تطبيق الكوبون.';
+        if (reason.includes('EXPIRED')) arReason = 'انتهت صلاحية هذا الكوبون.';
+        else if (reason.includes('STORE')) arReason = 'هذا الكوبون غير صالح لهذا المتجر.';
+        else if (reason.includes('MIN') || reason.includes('AMOUNT')) arReason = 'قيمة الطلب أقل من الحد الأدنى لتفعيل الكوبون.';
+        else if (reason.includes('LIMIT')) arReason = 'تم استنفاد الحد الأقصى لاستخدام هذا الكوبون.';
+        else if (reason.includes('INVALID') || reason.includes('NOT_FOUND')) arReason = 'رمز الكوبون غير صحيح.';
+        setCouponRejection(arReason);
+      }
     },
-    onError: (error: Error) => {
-      setCouponRejection(error.message);
+    onError: (error: unknown) => {
+      if (__DEV__) console.error('[CheckoutCouponError]', error);
+      setCouponRejection('تعذر التحقق من الكوبون، يرجى المحاولة لاحقاً.');
     },
   });
 
@@ -164,15 +198,54 @@ export default function CheckoutScreen() {
       maybePromptAndRegister(order.customerId).catch(() => undefined);
       router.replace(`/(customer)/orders/${order.id}`);
     },
-    onError: (error: Error) => {
+    onError: (error: unknown) => {
       isSubmittingRef.current = false;
-      showAlert('فشل تأكيد الطلب', error.message);
+      if (__DEV__) console.error('[PlaceOrderError]', error);
+      const orderError = error instanceof OrderException ? error : classifyOrderError(error);
+
+      // FR-008 & FR-009: Network failure / unknown write outcome
+      if (orderError.kind === 'network_error') {
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+        Alert.alert(
+          'تعذر التحقق من حالة الطلب',
+          'انقطع الاتصال بالإنترنت أثناء تأكيد الطلب. يمكنك إعادة المحاولة بأمان أو التحقق من قائمة طلباتك.',
+          [
+            {
+              text: 'عرض طلباتي',
+              onPress: () => router.push('/(customer)/orders'),
+            },
+            {
+              text: 'إعادة المحاولة',
+              onPress: () => {
+                handleConfirmOrder();
+              },
+              style: 'default',
+            },
+          ],
+          { cancelable: true },
+        );
+        return;
+      }
+
+      showAlert('تعذر إتمام الطلب', getOrderErrorMessage(orderError.kind));
     },
   });
 
   const handleConfirmOrder = useCallback(() => {
     // Synchronous guard (Phase 4 / T013): immediately drop secondary taps prior to render state
-    if (isSubmittingRef.current || placeOrderMutation.isPending) {
+    if (isSubmittingRef.current || placeOrderMutation.isPending || isRevalidating) {
+      return;
+    }
+    if (lastResult?.isStoreClosed) {
+      showAlert('المتجر مغلق', 'هذا المتجر مغلق حالياً ولا يستقبل طلبات جديدة.');
+      return;
+    }
+    if (lastResult?.unavailableItems && lastResult.unavailableItems.length > 0) {
+      showAlert('أصناف غير متوفرة', 'يرجى إزالة الأصناف غير المتوفرة من سلتك للمتابعة.');
+      return;
+    }
+    if (lastResult?.priceDifferences && lastResult.priceDifferences.length > 0) {
+      setPriceModalVisible(true);
       return;
     }
     if (!effectiveAddress || !storeId) {
@@ -214,6 +287,8 @@ export default function CheckoutScreen() {
     checkoutIntent,
     dispatch,
     placeOrderMutation,
+    isRevalidating,
+    lastResult,
   ]);
 
   const total = subtotal - couponDiscount + DELIVERY_FEE;
@@ -336,12 +411,86 @@ export default function CheckoutScreen() {
           </View>
         </Surface>
 
+        {lastResult?.isStoreClosed ? (
+          <Surface
+            style={[
+              styles.alertBanner,
+              {
+                backgroundColor: colors.errorSubtle,
+                borderColor: colors.destructive,
+              },
+            ]}
+          >
+            <View style={styles.alertBannerHeader}>
+              <Icon name="AlertCircle" size={20} color={colors.destructive} />
+              <Text
+                style={[styles.alertBannerTitle, { color: colors.destructive }]}
+              >
+                المتجر مغلق حالياً
+              </Text>
+            </View>
+            <Text
+              style={[styles.alertBannerText, { color: colors.destructive }]}
+            >
+              {lastResult.storeName
+                ? `متجر "${lastResult.storeName}" مغلق حالياً ولا يقبل طلبات جديدة.`
+                : 'هذا المتجر مغلق حالياً ولا يقبل طلبات جديدة.'}
+            </Text>
+          </Surface>
+        ) : null}
+
+        {lastResult?.unavailableItems &&
+        lastResult.unavailableItems.length > 0 ? (
+          <Surface
+            style={[
+              styles.alertBanner,
+              {
+                backgroundColor: colors.primarySubtle,
+                borderColor: colors.primary,
+              },
+            ]}
+          >
+            <View style={styles.alertBannerHeader}>
+              <Icon name="AlertTriangle" size={20} color={colors.primary} />
+              <Text
+                style={[
+                  styles.alertBannerTitle,
+                  { color: colors.foreground },
+                ]}
+              >
+                أصناف غير متوفرة في السلة ({lastResult.unavailableItems.length})
+              </Text>
+            </View>
+            <Text
+              style={[
+                styles.alertBannerText,
+                { color: colors.mutedForeground },
+              ]}
+            >
+              {lastResult.unavailableItems.map((i) => i.productName).join('، ')}
+            </Text>
+            <PrimaryButton
+              title="إزالة الأصناف غير المتوفرة للمتابعة"
+              onPress={() => removeUnavailable(lastResult.unavailableItems)}
+            />
+          </Surface>
+        ) : null}
+
         <PrimaryButton
-          title="تأكيد الطلب"
+          title={lastResult?.isStoreClosed ? 'المتجر مغلق حالياً' : 'تأكيد الطلب'}
           icon="checkmark-circle-outline"
           onPress={handleConfirmOrder}
-          loading={placeOrderMutation.isPending}
-          disabled={!effectiveAddress || placeOrderMutation.isPending}
+          loading={placeOrderMutation.isPending || isRevalidating}
+          disabled={
+            !effectiveAddress ||
+            placeOrderMutation.isPending ||
+            isRevalidating ||
+            Boolean(lastResult?.isStoreClosed) ||
+            Boolean(
+              lastResult?.unavailableItems &&
+                lastResult.unavailableItems.length > 0,
+            )
+          }
           testID="checkout-confirm"
         />
       </ScrollView>
@@ -357,6 +506,21 @@ export default function CheckoutScreen() {
           const created = await addressRepository.createAddress(customerId!, input);
           queryClient.invalidateQueries({ queryKey: ['addresses'] });
           setSelectedAddress(created);
+        }}
+      />
+
+      <PriceChangeModal
+        visible={priceModalVisible}
+        differences={lastResult?.priceDifferences ?? []}
+        onAccept={() => {
+          if (lastResult?.priceDifferences) {
+            acceptPriceChanges(lastResult.priceDifferences);
+          }
+          setPriceModalVisible(false);
+        }}
+        onReject={() => {
+          setPriceModalVisible(false);
+          handleBack();
         }}
       />
     </AppScreen>
@@ -483,5 +647,26 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     },
     placeOrderButton: {
       alignSelf: 'stretch',
+    },
+    alertBanner: {
+      padding: theme.spacing.md,
+      borderRadius: theme.radii.large,
+      borderWidth: 1,
+      gap: theme.spacing.xs,
+    },
+    alertBannerHeader: {
+      flexDirection: 'row-reverse',
+      alignItems: 'center',
+      gap: theme.spacing.xs,
+    },
+    alertBannerTitle: {
+      ...theme.typography.label,
+      fontWeight: '700',
+      textAlign: 'right',
+    },
+    alertBannerText: {
+      ...theme.typography.caption,
+      textAlign: 'right',
+      lineHeight: 18,
     },
   });

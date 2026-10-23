@@ -20,6 +20,7 @@ export { SectionHeader } from './SectionHeader';
 export { LoadingState } from './LoadingState';
 export { EmptyState } from './EmptyState';
 export { ErrorState } from './ErrorState';
+export { RootErrorBoundary, ErrorBoundary } from './ErrorBoundary';
 export { Sari3BottomSheet } from './Sari3BottomSheet';
 export { SwipeableBottomSheetModal } from './SwipeableBottomSheetModal';
 export type { SwipeableBottomSheetModalProps } from './SwipeableBottomSheetModal';

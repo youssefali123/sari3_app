@@ -1,5 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { useDispatch, useSelector } from 'react-redux';
+import { useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { cartSlice, hydrateCart } from '@/features/cart/application/cartSlice';
 import { areaSlice } from '@/features/areas/application/areaSlice';
@@ -24,6 +25,56 @@ export const useAppSelector = useSelector.withTypes<RootState>();
 
 let isHydrated = false;
 let previousSerializedCart = '';
+let hydrationPromise: Promise<void> | null = null;
+let resolveHydration: (() => void) | null = null;
+
+export function getIsCartHydrated(): boolean {
+  return isHydrated;
+}
+
+/**
+ * Returns a promise that resolves when AsyncStorage finishes reading the cart,
+ * or when the safety timeout (1,500ms) expires (FR-017, FR-018).
+ */
+export function waitForCartHydration(timeoutMs = 1500): Promise<void> {
+  if (isHydrated) return Promise.resolve();
+
+  if (!hydrationPromise) {
+    hydrationPromise = new Promise<void>((resolve) => {
+      resolveHydration = resolve;
+      // Enforce safety timeout so startup is never blocked indefinitely
+      setTimeout(() => {
+        isHydrated = true;
+        resolve();
+      }, timeoutMs);
+    });
+  }
+
+  return hydrationPromise;
+}
+
+/**
+ * Hook to observe cart hydration state during startup gating in _layout.tsx
+ */
+export function useCartHydrated(): boolean {
+  const [hydrated, setHydrated] = useState(isHydrated);
+
+  useEffect(() => {
+    if (isHydrated) {
+      setHydrated(true);
+      return;
+    }
+    let isMounted = true;
+    waitForCartHydration().then(() => {
+      if (isMounted) setHydrated(true);
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  return hydrated;
+}
 
 /**
  * Initializes the cart from AsyncStorage.
@@ -56,6 +107,10 @@ export async function initializeCartPersistence(): Promise<void> {
     console.warn('[CartStorage] Failed to load cart from AsyncStorage:', error);
   } finally {
     isHydrated = true;
+    if (resolveHydration) {
+      resolveHydration();
+      resolveHydration = null;
+    }
   }
 }
 

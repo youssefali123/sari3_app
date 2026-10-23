@@ -59,7 +59,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "lint": "expo lint",
-    "test": "tsx --test src/features/cart/application/__tests__/checkoutIntentResolver.test.ts"
+    "test": "tsx --test src/features/cart/application/__tests__/checkoutIntentResolver.test.ts src/shared/lib/__tests__/errorClassifier.test.ts"
   },
   "private": true,
   "packageManager": "pnpm@9.15.9"

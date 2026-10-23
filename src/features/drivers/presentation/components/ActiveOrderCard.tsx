@@ -11,6 +11,8 @@ import { PrimaryButton, Surface } from '@/shared/ui/components/AppUI';
 import { formatCurrency } from '@/shared/utils/formatting';
 import { Order } from '@/features/orders/domain/entities/Order';
 import { OrderStatus } from '@/features/orders/domain/entities/OrderStatus';
+import { classifyDriverError } from '@/features/drivers/infrastructure/driverErrorClassifier';
+import { getDriverErrorMessage } from '@/features/drivers/presentation/messages/driversErrorMessages.ar';
 
 const STATUS_LABELS: Record<string, string> = {
   pending: 'قيد الانتظار',
@@ -402,7 +404,7 @@ export function ActiveOrderCard({
 
       {error && !customerCancelled ? (
         <Text style={[styles.errorText, { color: colors.destructive }]}>
-          {error.message}
+          {getDriverErrorMessage(classifyDriverError(error).kind)}
         </Text>
       ) : null}
 
