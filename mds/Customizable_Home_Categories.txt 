@@ -1,0 +1,51 @@
+# Feature: Dynamic Customizable Home Categories Grid (Verticals)
+
+## Overview & Objective
+Replace the static hardcoded two-tile section ("Restaurants" and "Market") on the customer home screen with a fully dynamic, database-driven 3-column categories grid ("Order Now" / "اطلب دلوقتي") that is customizable from Supabase (and ready for a future web admin dashboard). Users can browse top departments on the home screen, view all departments via an interactive "View All" modal/screen, and filter stores by category within their selected operational area.
+
+## Key Requirements & Capabilities
+
+### 1. Dynamic Database-Driven Categories
+- Categories must be fetched dynamically from the `categories` table in Supabase.
+- Each category record supports:
+  - `id` (UUID primary key)
+  - `name` (Localized display title, e.g., "سوبرماركت", "صيدليات", "لحوم ودواجن", "مخبوزات وحلويات")
+  - `slug` (Unique identifier)
+  - `image_url` (High-resolution 3D / cutout asset URL)
+  - `display_order` (Integer sequence for custom sorting)
+  - `is_active` (Boolean flag to activate/deactivate categories instantly)
+- Stores are associated with one or more categories via the `restaurant_categories` junction table.
+- Future-ready architecture: A future web dashboard can perform full CRUD (create, update, delete, reorder, change images) on categories without requiring mobile app updates.
+
+### 2. Home Screen 3-Column Grid UI/UX
+- **Placement**: Replaces the static two-tile ("مطاعم" / "ماركت") section directly beneath the greeting hero banner.
+- **Header**:
+  - Section title on the right (RTL start): "اطلب دلوقتي" ("Order Now").
+  - Action link on the left (RTL end): "عرض الكل" ("View All") styled in brand primary color.
+- **Grid Layout**:
+  - Balanced 3-column grid layout responsive across different screen sizes.
+  - Home screen displays the top 6 active categories (2 rows × 3 columns) based on `display_order`.
+  - Each grid item includes:
+    - High-quality 3D / cutout image with a clean, transparent background.
+    - Category title placed below the image with clean, legible typography.
+    - Smooth interactive press feedback (scale: 0.95 and subtle opacity).
+  - Polished skeleton placeholder state while categories are loading.
+
+### 3. "View All" ("عرض الكل") Experience
+- Tapping "عرض الكل" opens a comprehensive modal or dedicated view (e.g., swipeable bottom sheet or full-page grid) displaying all active categories.
+- Includes a quick search input to help users instantly find any department when the catalog expands to dozens of verticals.
+
+### 4. Category Filtering & Store Navigation
+- Tapping any category on the home grid or in "View All" navigates to the `browse` screen with the selected category ID and name.
+- The `browse` screen dynamically sets its title to the selected category name (e.g., "صيدليات" or "سوبرماركت").
+- Only stores belonging to that category within the user's active `selectedAreaId` are displayed.
+- Displays a user-friendly empty state if no stores in that category currently operate in the selected area.
+
+### 5. Initial Seed Data
+- Seed the initial 6 core verticals with curated 3D assets:
+  1. Supermarket ("سوبرماركت")
+  2. Restaurants ("مطاعم")
+  3. Pharmacies ("صيدليات")
+  4. Meat & Poultry ("لحوم ودواجن")
+  5. Bakeries & Sweets ("مخبوزات وحلويات")
+  6. Pet Shops ("محلات الحيوانات الأليفة")

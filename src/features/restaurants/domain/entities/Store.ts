@@ -1,4 +1,5 @@
 import { MoneyAmount } from '@/shared/types/common';
+import type { CuisineCategory } from './CuisineCategory';
 
 /**
  * Unified store type: both restaurants and markets share one model (BR-001).
@@ -12,6 +13,8 @@ export interface Store {
   id: string;
   name: string;
   type: StoreType;
+  departmentId?: string | null;
+  departmentName?: string | null;
   description: string | null;
   imageUrl: string | null;
   address: string;
@@ -20,6 +23,8 @@ export interface Store {
   isOpen: boolean;
   /** Free-text cuisine/category tag from the catalog (e.g. "برجر وفرايد تشيكن"). */
   category: string | null;
+  /** Normalized multi-category assignments. */
+  categories?: readonly CuisineCategory[];
   /** Operational area the store belongs to (exact-match browsing, FR-004). */
   areaId: string;
   createdAt: string;

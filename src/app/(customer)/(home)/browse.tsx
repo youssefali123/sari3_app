@@ -5,10 +5,12 @@ import { useLocalSearchParams } from 'expo-router';
 import { useAppRouter } from '@/shared/ui/hooks/useAppRouter';
 
 import { useSelectedArea } from '@/features/areas/application/hooks/useSelectedArea';
+import { useCuisineCategories } from '@/features/restaurants/application/hooks/useCuisineCategories';
 import { StoreType } from '@/features/restaurants/domain/entities/Store';
 import { StoreRepository } from '@/features/restaurants/domain/repositories/StoreRepository';
 import { SupabaseStoreRepository } from '@/features/restaurants/infrastructure/SupabaseStoreRepository';
 import { StoreCard } from '@/features/restaurants/presentation/StoreCard';
+import { CuisineCarousel } from '@/features/restaurants/presentation/components/CuisineCarousel';
 import { useTheme } from '@/shared/ui/context/ThemeContext';
 import { AppScreen, BrandHeader } from '@/shared/ui/components/AppUI';
 import { Button } from '@/shared/ui/components/Button';
@@ -29,54 +31,127 @@ const COPY = {
   market: {
     title: 'ماركت',
     subtitle: 'كل احتياجاتك اليومية',
-    emptyTitle: 'لا توجد ماركت بعد',
-    emptyMessage: 'لم نجد ماركت في منطقتك الحالية. جرّب تغيير المنطقة أو عد لاحقاً.',
+    emptyTitle: 'لا توجد متاجر بعد',
+    emptyMessage: 'لم نجد متاجر في منطقتك الحالية. جرّب تغيير المنطقة أو عد لاحقاً.',
     countSuffix: 'متجر',
   },
 } as const;
 
 /**
- * Category browse screen (مطاعم / ماركت) — dedicated full-screen listing.
- * Uses the full StoreCard in a single-column list for richer store details,
- * matching the old system's pattern while keeping the new design identity.
+ * Category browse screen — dedicated full-screen listing.
+ * Supports dynamic department browsing (departmentId / departmentName)
+ * as well as legacy type parameter ('restaurant' / 'market').
  */
 export default function BrowseScreen() {
   const router = useAppRouter();
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
-  const params = useLocalSearchParams<{ type?: string }>();
+  const params = useLocalSearchParams<{
+    type?: string;
+    categoryId?: string;
+    departmentId?: string;
+    departmentName?: string;
+  }>();
+
   const storeType: StoreType = params.type === 'market' ? 'market' : 'restaurant';
-  const copy = COPY[storeType];
+  const legacyCopy = COPY[storeType];
+
+  const title = params.departmentName ?? legacyCopy.title;
+  const countSuffix = params.departmentId ? 'متجر' : legacyCopy.countSuffix;
 
   const { selectedAreaId } = useSelectedArea();
 
   const {
-    data: stores,
-    isLoading,
-    isError,
-    refetch,
-  } = useQuery({
-    queryKey: ['stores', 'browse', storeType, selectedAreaId],
-    queryFn: () => storeRepository.getStores(storeType, selectedAreaId ?? undefined),
+    categories: cuisineCategories,
+    isLoading: isCuisinesLoading,
+    selectedCategoryId,
+    selectedCategory,
+    selectCategory,
+    filteredStores: categoryFilteredStores,
+    isFilteringStores,
+    isLoadingFilteredStores,
+  } = useCuisineCategories({
+    type: params.departmentId ? undefined : storeType,
+    departmentId: params.departmentId ?? undefined,
+    areaId: selectedAreaId ?? undefined,
+    initialCategoryId: params.categoryId ?? null,
   });
 
+  const {
+    data: stores,
+    isLoading: isStoresLoading,
+    isError: isStoresError,
+    refetch,
+  } = useQuery({
+    queryKey: ['stores', 'browse', params.departmentId ?? storeType, selectedAreaId],
+    queryFn: () =>
+      storeRepository.getStores(
+        params.departmentId ? undefined : storeType,
+        selectedAreaId ?? undefined,
+        params.departmentId ?? undefined
+      ),
+  });
+
+  const activeStores = useMemo(() => {
+    if (isFilteringStores) {
+      const filtered = categoryFilteredStores ?? [];
+      if (params.departmentId) {
+        return filtered.filter((s) => s.departmentId === params.departmentId);
+      }
+      return filtered;
+    }
+    return stores ?? [];
+  }, [isFilteringStores, categoryFilteredStores, stores, params.departmentId]);
+
   const sortedStores = useMemo(() => {
-    if (!stores) return [];
-    return [...stores].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
-  }, [stores]);
+    return [...activeStores].sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
+  }, [activeStores]);
+
+  const isLoading = isStoresLoading || (isFilteringStores && isLoadingFilteredStores);
+  const isError = isStoresError;
 
   const countLabel =
     !isLoading && !isError && sortedStores.length > 0
-      ? `${sortedStores.length} ${copy.countSuffix}`
+      ? `${sortedStores.length} ${countSuffix}`
       : undefined;
+
+  const subtitle = selectedCategory
+    ? countLabel
+      ? `${selectedCategory.name} • ${countLabel}`
+      : selectedCategory.name
+    : (countLabel ?? (params.departmentName ? `اطلب من أفضل ${title}` : legacyCopy.subtitle));
+
+  const emptyTitle = isFilteringStores && selectedCategory
+    ? `لا توجد نتائج في تصنيف ${selectedCategory.name}`
+    : params.departmentName
+      ? `لا توجد متاجر في قسم ${params.departmentName} حالياً`
+      : legacyCopy.emptyTitle;
+
+  const emptyMessage = isFilteringStores
+    ? 'لم نجد متاجر مطابقة لهذا التصنيف في منطقتك حالياً. يمكنك تصفح كافة المتاجر أو اختيار تصنيف آخر.'
+    : params.departmentName
+      ? `لم نجد متاجر في قسم ${params.departmentName} بمنطقتك الحالية. جرّب تغيير المنطقة أو عد لاحقاً.`
+      : legacyCopy.emptyMessage;
 
   return (
     <AppScreen>
       <BrandHeader
-        title={copy.title}
-        subtitle={countLabel ?? copy.subtitle}
+        title={title}
+        subtitle={subtitle}
         onBack={() => router.back()}
       />
+
+      {cuisineCategories.length > 0 && (
+        <View style={styles.carouselContainer}>
+          <CuisineCarousel
+            categories={cuisineCategories}
+            selectedCategoryId={selectedCategoryId}
+            onSelectCategory={selectCategory}
+            isLoading={isCuisinesLoading}
+            showHeader={false}
+          />
+        </View>
+      )}
 
       {isLoading ? (
         <View style={styles.skeletonList}>
@@ -87,20 +162,28 @@ export default function BrowseScreen() {
       ) : isError ? (
         <ErrorState
           title="تعذر التحميل"
-          message={`حدث خطأ أثناء جلب ${copy.title}. حاول مرة أخرى.`}
+          message={`حدث خطأ أثناء جلب ${title}. حاول مرة أخرى.`}
           onRetry={() => void refetch()}
         />
       ) : sortedStores.length === 0 ? (
         <EmptyState
           emoji={storeType === 'market' ? '🧺' : '🍽️'}
-          title={copy.emptyTitle}
-          message={copy.emptyMessage}
+          title={emptyTitle}
+          message={emptyMessage}
           action={
-            <Button
-              label="العودة للرئيسية"
-              variant="outlined"
-              onPress={() => router.push('/(customer)/(home)')}
-            />
+            isFilteringStores ? (
+              <Button
+                label="عرض كل المتاجر"
+                variant="outlined"
+                onPress={() => selectCategory(null)}
+              />
+            ) : (
+              <Button
+                label="العودة للرئيسية"
+                variant="outlined"
+                onPress={() => router.push('/(customer)/(home)' as any)}
+              />
+            )
           }
         />
       ) : (
@@ -115,7 +198,7 @@ export default function BrowseScreen() {
           renderItem={({ item }) => (
             <StoreCard
               store={item}
-              onPress={() => router.push(`/store/${item.id}`)}
+              onPress={() => router.push(`/store/${item.id}` as any)}
             />
           )}
         />
@@ -129,6 +212,12 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
     container: {
       flex: 1,
       backgroundColor: theme.colors.background,
+    },
+    carouselContainer: {
+      borderBottomWidth: StyleSheet.hairlineWidth,
+      borderBottomColor: theme.colors.border,
+      backgroundColor: theme.colors.background,
+      paddingBottom: theme.spacing.xs,
     },
     listContent: {
       paddingHorizontal: theme.spacing.md,

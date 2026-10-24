@@ -49,6 +49,7 @@ export interface RestaurantsRow {
   category: string | null;
   type: StoreType;
   area_id: string;
+  department_id: string | null;
   created_at: string;
 }
 
@@ -217,9 +218,42 @@ export interface ProductVariantsRow {
   display_order: number;
 }
 
+export interface DepartmentsRow {
+  id: string;
+  name: string;
+  slug: string;
+  image_url: string | null;
+  icon_name: string | null;
+  display_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface CategoriesRow {
+  id: string;
+  name: string;
+  slug: string;
+  image_url: string | null;
+  icon_name: string | null;
+  display_order: number;
+  is_active: boolean;
+  type: StoreType;
+  department_id: string | null;
+  created_at: string;
+}
+
+export interface RestaurantCategoriesRow {
+  restaurant_id: string;
+  category_id: string;
+  created_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
+      departments: { Row: DepartmentsRow };
+      categories: { Row: CategoriesRow };
+      restaurant_categories: { Row: RestaurantCategoriesRow };
       product_variants: { Row: ProductVariantsRow };
       areas: { Row: AreasRow };
       driver_areas: { Row: DriverAreasRow };

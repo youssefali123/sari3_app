@@ -5,7 +5,6 @@ import {
   FlatList,
   Keyboard,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -27,6 +26,9 @@ import { StoreRepository } from '@/features/restaurants/domain/repositories/Stor
 import { SupabaseStoreRepository } from '@/features/restaurants/infrastructure/SupabaseStoreRepository';
 import { PopularStoreCard } from '@/features/restaurants/presentation/PopularStoreCard';
 import { StoreCard } from '@/features/restaurants/presentation/StoreCard';
+import { useCuisineCategories } from '@/features/restaurants/application/hooks/useCuisineCategories';
+import { CuisineCarousel } from '@/features/restaurants/presentation/components/CuisineCarousel';
+import { HomeDepartmentsGrid } from '@/features/departments/presentation/components/HomeDepartmentsGrid';
 import { PromotionRepository } from '@/features/promotions/domain/repositories/PromotionRepository';
 import { SupabasePromotionRepository } from '@/features/promotions/infrastructure/SupabasePromotionRepository';
 import { OrderRepository } from '@/features/orders/domain/repositories/OrderRepository';
@@ -98,6 +100,20 @@ export default function HomeScreen() {
     queryFn: () => storeRepository.getStores(undefined, selectedAreaId ?? undefined),
   });
 
+  const {
+    categories: cuisineCategories,
+    isLoading: isCuisinesLoading,
+    selectedCategoryId,
+    selectedCategory,
+    selectCategory,
+    filteredStores: categoryFilteredStores,
+    isFilteringStores,
+    isLoadingFilteredStores,
+  } = useCuisineCategories({
+    type: 'restaurant',
+    areaId: selectedAreaId ?? undefined,
+  });
+
   const { data: promotions } = useQuery({
     queryKey: ['promotions', 'active'],
     queryFn: () => promotionRepository.getActivePromotions(),
@@ -117,7 +133,12 @@ export default function HomeScreen() {
     return visible.reduce((latest, o) => (o.createdAt > latest.createdAt ? o : latest));
   }, [orders]);
 
-  const filteredStores = useMemo(() => stores ?? [], [stores]);
+  const filteredStores = useMemo(() => {
+    if (isFilteringStores) {
+      return categoryFilteredStores ?? [];
+    }
+    return stores ?? [];
+  }, [isFilteringStores, categoryFilteredStores, stores]);
 
   const popularStores = useMemo(() => {
     if (!stores) return [];
@@ -240,41 +261,8 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Category selection row: Restaurants vs Market */}
-        <View style={styles.categoryRow}>
-          <CategoryTile
-            title="مطاعم"
-            subtitle="أطيب الأكلات حولك"
-            icon="Utensils"
-            isActive={false}
-            activeBg="#fff2d1"
-            activeBorder="#f5bd16"
-            iconBg="#f5bd16"
-            iconColor="#191816"
-            onPress={() =>
-              router.push({
-                pathname: '/(customer)/(home)/browse',
-                params: { type: 'restaurant' },
-              })
-            }
-          />
-          <CategoryTile
-            title="ماركت"
-            subtitle="احتياجاتك اليومية"
-            icon="ShoppingBasket"
-            isActive={false}
-            activeBg={colors.secondary}
-            activeBorder={colors.secondaryForeground}
-            iconBg="#e4efe8"
-            iconColor="#286b47"
-            onPress={() =>
-              router.push({
-                pathname: '/(customer)/(home)/browse',
-                params: { type: 'market' },
-              })
-            }
-          />
-        </View>
+        {/* Dynamic Departments Grid (Feature 014) */}
+        <HomeDepartmentsGrid />
 
         {/* Search Bar Entry Trigger */}
         <Pressable
@@ -341,26 +329,44 @@ export default function HomeScreen() {
                 })
               }
             />
-            <ScrollView
+            <FlatList
               horizontal
+              inverted
+              data={popularStores}
+              keyExtractor={(store) => store.id}
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.carouselContainer}
-            >
-              {popularStores.map((store) => (
+              contentContainerStyle={styles.popularCarouselContent}
+              ItemSeparatorComponent={() => <View style={styles.carouselGap} />}
+              renderItem={({ item: store }) => (
                 <PopularStoreCard
-                  key={store.id}
                   store={store}
                   onPress={() => openStore(store.id)}
                 />
-              ))}
-            </ScrollView>
+              )}
+            />
           </View>
         ) : null}
 
+        {/* Visual Cuisines Carousel */}
+        <CuisineCarousel
+          categories={cuisineCategories}
+          selectedCategoryId={selectedCategoryId}
+          onSelectCategory={selectCategory}
+          isLoading={isCuisinesLoading}
+        />
+
         {/* Filtered Store List Section Title */}
         <View style={styles.sectionWrap}>
-          <SectionTitle title="كل المتاجر القريبة منك" />
-          {storesLoading ? (
+          <SectionTitle
+            title={
+              selectedCategory
+                ? `مطاعم ${selectedCategory.name}`
+                : 'كل المتاجر القريبة منك'
+            }
+            action={selectedCategoryId ? 'عرض الكل' : undefined}
+            onAction={selectedCategoryId ? () => selectCategory(null) : undefined}
+          />
+          {storesLoading || (isFilteringStores && isLoadingFilteredStores) ? (
             <View style={styles.listGap}>
               {[0, 1, 2].map((i) => (
                 <SkeletonCard
@@ -387,6 +393,13 @@ export default function HomeScreen() {
       router,
       promotions,
       popularStores,
+      cuisineCategories,
+      selectedCategoryId,
+      selectedCategory,
+      selectCategory,
+      isCuisinesLoading,
+      isFilteringStores,
+      isLoadingFilteredStores,
       storesLoading,
       storesError,
       openStore,
@@ -395,7 +408,24 @@ export default function HomeScreen() {
   );
 
   const listEmpty = useMemo(() => {
-    if (storesLoading || storesError) return null;
+    if (storesLoading || storesError || (isFilteringStores && isLoadingFilteredStores)) return null;
+
+    if (isFilteringStores && filteredStores.length === 0) {
+      return (
+        <EmptyState
+          title="لا توجد نتائج"
+          message={`لم نجد مطاعم تقدم ${selectedCategory?.name ?? 'هذا التصنيف'} في منطقتك حالياً.`}
+          action={
+            <Button
+              label="عرض كل المطاعم"
+              variant="primary"
+              onPress={() => selectCategory(null)}
+            />
+          }
+        />
+      );
+    }
+
     return (
       <EmptyState
         title="لا توجد متاجر"
@@ -413,7 +443,16 @@ export default function HomeScreen() {
         }
       />
     );
-  }, [storesLoading, storesError, selectedAreaId]);
+  }, [
+    storesLoading,
+    storesError,
+    isFilteringStores,
+    isLoadingFilteredStores,
+    filteredStores.length,
+    selectedCategory,
+    selectedAreaId,
+    selectCategory,
+  ]);
 
   const listFooter = useMemo(
     () => (
@@ -528,7 +567,13 @@ export default function HomeScreen() {
           {brandHeader}
           <FlatList
             style={styles.container}
-            data={storesLoading || storesError ? [] : filteredStores}
+            data={
+              storesLoading ||
+              storesError ||
+              (isFilteringStores && isLoadingFilteredStores)
+                ? []
+                : filteredStores
+            }
             renderItem={renderStoreItem}
             keyExtractor={storeKeyExtractor}
             ListHeaderComponent={listHeader}
@@ -558,72 +603,7 @@ export default function HomeScreen() {
   );
 }
 
-// ── Category Tile Component (SOURCE Project Exact Style) ─────────────────────
 
-function CategoryTile({
-  title,
-  subtitle,
-  icon,
-  isActive,
-  activeBg,
-  activeBorder,
-  iconBg,
-  iconColor,
-  onPress,
-}: {
-  title: string;
-  subtitle: string;
-  icon: string;
-  isActive: boolean;
-  activeBg: string;
-  activeBorder: string;
-  iconBg: string;
-  iconColor: string;
-  onPress: () => void;
-}) {
-  const colors = useColors();
-  const { theme } = useTheme();
-
-  return (
-    <View style={{ flex: 1 }}>
-      <Pressable
-        onPress={onPress}
-        unstable_pressDelay={0}
-        style={({ pressed }) => [
-          styles.categoryTile,
-          {
-            backgroundColor: isActive ? activeBg : colors.card,
-            borderColor: isActive ? activeBorder : colors.border,
-            opacity: pressed ? 0.88 : 1,
-            transform: [{ scale: pressed ? 0.98 : 1 }],
-          },
-        ]}
-      >
-        <View style={[styles.categoryIcon, { backgroundColor: iconBg }]}>
-          <Icon name={icon} size={22} color={iconColor} />
-        </View>
-        <View style={styles.categoryText}>
-          <Text
-            style={[
-              styles.categoryTitle,
-              { color: colors.foreground, fontFamily: theme.typography.headingSmall.fontFamily },
-            ]}
-          >
-            {title}
-          </Text>
-          <Text
-            style={[
-              styles.smallText,
-              { color: colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily },
-            ]}
-          >
-            {subtitle}
-          </Text>
-        </View>
-      </Pressable>
-    </View>
-  );
-}
 
 const styles = StyleSheet.create({
   container: {
@@ -839,6 +819,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     gap: 12,
     paddingVertical: 4,
+  },
+  popularCarouselContent: {
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+  },
+  carouselGap: {
+    width: 12,
   },
   listGap: {
     gap: 11,

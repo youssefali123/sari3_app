@@ -21,7 +21,13 @@ export const StoreCard = React.memo(function StoreCard({ store, onPress }: Store
   const colors = useColors();
   const { theme } = useTheme();
 
+  const categoriesText =
+    store.categories && store.categories.length > 0
+      ? store.categories.map((c) => c.name).join(' · ')
+      : undefined;
+
   const subtitle =
+    categoriesText ||
     store.category?.trim() ||
     store.description?.trim() ||
     (store.type === 'market' ? 'احتياجاتك اليومية' : 'أطيب الأكلات');
@@ -108,6 +114,18 @@ export const StoreCard = React.memo(function StoreCard({ store, onPress }: Store
         </Text>
 
         <View style={styles.metaRow}>
+          {store.departmentName ? (
+            <View style={[styles.departmentBadge, { backgroundColor: colors.primarySubtle }]}>
+              <Text
+                style={[
+                  styles.departmentBadgeText,
+                  { color: colors.primary, fontFamily: theme.typography.caption.fontFamily },
+                ]}
+              >
+                {store.departmentName}
+              </Text>
+            </View>
+          ) : null}
           <Text
             style={[
               styles.deliveryText,
@@ -195,6 +213,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row-reverse',
     alignItems: 'center',
     gap: 6,
+  },
+  departmentBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  departmentBadgeText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   deliveryText: {
     fontSize: 10,

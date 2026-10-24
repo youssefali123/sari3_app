@@ -23,7 +23,13 @@ export const PopularStoreCard = React.memo(function PopularStoreCard({ store, on
   const { theme } = useTheme();
   const styles = useMemo(() => createStyles(theme), [theme]);
 
+  const categoriesText =
+    store.categories && store.categories.length > 0
+      ? store.categories.map((c) => c.name).join(' · ')
+      : undefined;
+
   const categoryLine =
+    categoriesText ||
     store.description?.trim() ||
     store.address?.trim() ||
     (store.type === 'market' ? 'كل احتياجاتك اليومية' : null);

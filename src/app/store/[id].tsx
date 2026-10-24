@@ -1,9 +1,11 @@
 import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
+  LayoutChangeEvent,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -49,6 +51,63 @@ import { formatCurrency } from '@/shared/utils/formatting';
 const storeRepository: StoreRepository = new SupabaseStoreRepository();
 const productRepository: ProductRepository = new SupabaseProductRepository();
 
+interface CategoryPillItem {
+  id: string;
+  name: string;
+  count: number;
+}
+
+interface CategoryPillsBarProps {
+  categoryPills: CategoryPillItem[];
+  selectedCategoryId: string;
+  onSelect: (id: string) => void;
+  colors: ReturnType<typeof useColors>;
+}
+
+const CategoryPillsBar: React.FC<CategoryPillsBarProps> = React.memo(
+  ({ categoryPills, selectedCategoryId, onSelect, colors }) => {
+    return (
+      <FlatList
+        horizontal
+        inverted
+        data={categoryPills}
+        keyExtractor={(item) => item.id}
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoriesScroll}
+        ItemSeparatorComponent={() => <View style={styles.pillGap} />}
+        renderItem={({ item }) => {
+          const active = selectedCategoryId === item.id;
+          return (
+            <Pressable
+              onPress={() => onSelect(item.id)}
+              unstable_pressDelay={0}
+              style={({ pressed }) => [
+                styles.categoryPill,
+                active
+                  ? { backgroundColor: colors.primary, borderColor: colors.primary }
+                  : { backgroundColor: colors.card, borderColor: colors.border },
+                { opacity: pressed ? 0.8 : 1 },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.categoryPillText,
+                  {
+                    color: active ? colors.foreground : colors.mutedForeground,
+                    fontWeight: active ? '700' : '500',
+                  },
+                ]}
+              >
+                {item.name} ({item.count})
+              </Text>
+            </Pressable>
+          );
+        }}
+      />
+    );
+  },
+);
+
 export default function StoreDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const storeId = id as string;
@@ -63,6 +122,43 @@ export default function StoreDetailScreen() {
   const cartStoreId = useAppSelector(selectCartStoreId);
 
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('all');
+  const [isSticky, setIsSticky] = useState<boolean>(false);
+  const isStickyRef = React.useRef<boolean>(false);
+  const categoriesOffsetRef = React.useRef<number>(340);
+  const flatListRef = React.useRef<FlatList<Product>>(null);
+
+  const handleCategoriesLayout = useCallback((event: LayoutChangeEvent) => {
+    const y = event.nativeEvent.layout.y;
+    if (y > 0) {
+      categoriesOffsetRef.current = y + 8;
+    }
+  }, []);
+
+  const handleScroll = useCallback(
+    (event: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const scrollY = event.nativeEvent.contentOffset.y;
+      const threshold = categoriesOffsetRef.current;
+      const shouldBeSticky = scrollY >= threshold;
+      if (shouldBeSticky !== isStickyRef.current) {
+        isStickyRef.current = shouldBeSticky;
+        setIsSticky(shouldBeSticky);
+      }
+    },
+    [],
+  );
+
+  const handleCategorySelect = useCallback(
+    (categoryId: string, fromSticky: boolean = false) => {
+      setSelectedCategoryId(categoryId);
+      if (fromSticky && flatListRef.current) {
+        flatListRef.current.scrollToOffset({
+          offset: categoriesOffsetRef.current,
+          animated: true,
+        });
+      }
+    },
+    [],
+  );
 
   const storeQuery = useQuery({
     queryKey: ['store', storeId],
@@ -102,11 +198,32 @@ export default function StoreDetailScreen() {
   const categories = useMemo(() => categoriesQuery.data ?? [], [categoriesQuery.data]);
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
 
+  // Map category ID to its display order for stable sorting
+  const categoryOrderMap = useMemo(() => {
+    const map = new Map<string, number>();
+    categories.forEach((cat, index) => {
+      map.set(cat.id, cat.displayOrder ?? index);
+    });
+    return map;
+  }, [categories]);
+
+  // Sort products according to category order, then by product name
+  const sortedProducts = useMemo(() => {
+    return [...products].sort((a, b) => {
+      const orderA = a.categoryId ? (categoryOrderMap.get(a.categoryId) ?? 9999) : 9999;
+      const orderB = b.categoryId ? (categoryOrderMap.get(b.categoryId) ?? 9999) : 9999;
+      if (orderA !== orderB) {
+        return orderA - orderB;
+      }
+      return a.name.localeCompare(b.name, 'ar');
+    });
+  }, [products, categoryOrderMap]);
+
   // Filter products by selected category
   const filteredProducts = useMemo(() => {
-    if (selectedCategoryId === 'all') return products;
-    return products.filter((p) => p.categoryId === selectedCategoryId);
-  }, [products, selectedCategoryId]);
+    if (selectedCategoryId === 'all') return sortedProducts;
+    return sortedProducts.filter((p) => p.categoryId === selectedCategoryId);
+  }, [sortedProducts, selectedCategoryId]);
 
   // Precompute category product counts efficiently (O(N) instead of O(N * categories))
   const categoryCounts = useMemo(() => {
@@ -118,6 +235,17 @@ export default function StoreDetailScreen() {
     }
     return counts;
   }, [products]);
+
+  const categoryPills = useMemo(() => {
+    return [
+      { id: 'all', name: 'الكل', count: products.length },
+      ...categories.map((cat) => ({
+        id: cat.id,
+        name: cat.name,
+        count: categoryCounts[cat.id] ?? 0,
+      })),
+    ];
+  }, [categories, products.length, categoryCounts]);
 
   const cartBelongsToThisStore = cartStoreId === null || cartStoreId === storeId;
   const visibleCartItems = cartBelongsToThisStore ? cartItems : [];
@@ -269,68 +397,16 @@ export default function StoreDetailScreen() {
 
         {/* Category Filter Pills (if categories exist) */}
         {categories.length > 0 && (
-          <View style={styles.categoriesContainer}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesScroll}
-            >
-              <Pressable
-                onPress={() => setSelectedCategoryId('all')}
-                unstable_pressDelay={0}
-                style={({ pressed }) => [
-                  styles.categoryPill,
-                  selectedCategoryId === 'all'
-                    ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                    : { backgroundColor: colors.card, borderColor: colors.border },
-                  { opacity: pressed ? 0.8 : 1 },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.categoryPillText,
-                    {
-                      color: selectedCategoryId === 'all' ? colors.foreground : colors.mutedForeground,
-                      fontWeight: selectedCategoryId === 'all' ? '700' : '500',
-                    },
-                  ]}
-                >
-                  الكل ({products.length})
-                </Text>
-              </Pressable>
-
-              {categories.map((cat) => {
-                const count = categoryCounts[cat.id] ?? 0;
-                const active = selectedCategoryId === cat.id;
-                return (
-                  <Pressable
-                    key={cat.id}
-                    onPress={() => setSelectedCategoryId(cat.id)}
-                    unstable_pressDelay={0}
-                    style={({ pressed }) => [
-                      styles.categoryPill,
-                      active
-                        ? { backgroundColor: colors.primary, borderColor: colors.primary }
-                        : { backgroundColor: colors.card, borderColor: colors.border },
-                      { opacity: pressed ? 0.8 : 1 },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.categoryPillText,
-                        {
-                          color: active ? colors.foreground : colors.mutedForeground,
-                          fontWeight: active ? '700' : '500',
-                        },
-                      ]}
-                    >
-                      {cat.name} ({count})
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
+          <View
+            style={styles.categoriesContainer}
+            onLayout={handleCategoriesLayout}
+          >
+            <CategoryPillsBar
+              categoryPills={categoryPills}
+              selectedCategoryId={selectedCategoryId}
+              onSelect={(id) => handleCategorySelect(id, false)}
+              colors={colors}
+            />
           </View>
         )}
 
@@ -346,11 +422,13 @@ export default function StoreDetailScreen() {
     storeIsOpen,
     colors,
     theme,
-    categories,
+    categories.length,
+    categoryPills,
     selectedCategoryId,
     products.length,
-    categoryCounts,
     filteredProducts.length,
+    handleCategoriesLayout,
+    handleCategorySelect,
   ]);
 
   const listEmpty = useMemo(() => {
@@ -438,56 +516,81 @@ export default function StoreDetailScreen() {
         }
       />
 
-      <FlatList
-        style={styles.container}
-        data={productsQuery.isLoading ? [] : filteredProducts}
-        renderItem={renderProductItem}
-        keyExtractor={keyExtractor}
-        ListHeaderComponent={listHeader}
-        ListEmptyComponent={listEmpty}
-        contentContainerStyle={[
-          styles.contentContainer,
-          {
-            paddingBottom:
-              (cartCount > 0 ? 110 : 30) +
-              Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 16),
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-      />
-
-      {/* Floating Bottom Cart Bar */}
-      {cartCount > 0 && (
-        <View
-          style={[
-            styles.floatingCartWrapper,
-            {
-              bottom:
-                Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 0) + 16,
-            },
-          ]}
-        >
-          <Pressable
-            accessibilityRole="button"
-            onPress={() => router.push('/(customer)/cart')}
-            unstable_pressDelay={0}
-            style={({ pressed }) => [
-              styles.floatingCartBar,
-              { backgroundColor: colors.primary, opacity: pressed ? 0.92 : 1 },
+      <View style={styles.bodyWrap}>
+        {/* Sticky Category Bar beneath BrandHeader */}
+        {isSticky && categories.length > 0 && (
+          <View
+            style={[
+              styles.stickyBar,
+              {
+                backgroundColor: colors.background,
+                borderBottomColor: colors.border,
+              },
             ]}
           >
-            <View style={styles.cartBadgeCircle}>
-              <Text style={styles.cartBadgeText}>{cartCount}</Text>
-            </View>
-            <View style={styles.cartInfoWrap}>
-              <Text style={styles.cartViewText}>عرض سلة الطلبات</Text>
-              <Text style={styles.cartTotalText}>{formatCurrency(cartTotal)}</Text>
-            </View>
-            <Icon name="ShoppingBag" size={22} color={colors.foreground} />
-          </Pressable>
-        </View>
-      )}
+            <CategoryPillsBar
+              categoryPills={categoryPills}
+              selectedCategoryId={selectedCategoryId}
+              onSelect={(id) => handleCategorySelect(id, true)}
+              colors={colors}
+            />
+          </View>
+        )}
+
+        <FlatList
+          ref={flatListRef}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          style={styles.container}
+          data={productsQuery.isLoading ? [] : filteredProducts}
+          renderItem={renderProductItem}
+          keyExtractor={keyExtractor}
+          ListHeaderComponent={listHeader}
+          ListEmptyComponent={listEmpty}
+          contentContainerStyle={[
+            styles.contentContainer,
+            {
+              paddingBottom:
+                (cartCount > 0 ? 110 : 30) +
+                Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 16),
+            },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        />
+
+        {/* Floating Bottom Cart Bar */}
+        {cartCount > 0 && (
+          <View
+            style={[
+              styles.floatingCartWrapper,
+              {
+                bottom:
+                  Math.max(insets.bottom, Platform.OS === 'android' ? 56 : 0) + 16,
+              },
+            ]}
+          >
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push('/(customer)/cart')}
+              unstable_pressDelay={0}
+              style={({ pressed }) => [
+                styles.floatingCartBar,
+                { backgroundColor: colors.primary, opacity: pressed ? 0.92 : 1 },
+              ]}
+            >
+              <View style={styles.cartBadgeCircle}>
+                <Text style={styles.cartBadgeText}>{cartCount}</Text>
+              </View>
+              <View style={styles.cartInfoWrap}>
+                <Text style={styles.cartViewText}>عرض سلة الطلبات</Text>
+                <Text style={styles.cartTotalText}>{formatCurrency(cartTotal)}</Text>
+              </View>
+              <Icon name="ShoppingBag" size={22} color={colors.foreground} />
+            </Pressable>
+          </View>
+        )}
+      </View>
 
       {/* Cross-store conflict modal */}
       <StoreConflictModal />
@@ -496,6 +599,24 @@ export default function StoreDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  bodyWrap: {
+    flex: 1,
+    position: 'relative',
+  },
+  stickyBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 20,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   container: {
     flex: 1,
   },
@@ -628,8 +749,10 @@ const styles = StyleSheet.create({
   },
   categoriesScroll: {
     paddingHorizontal: 18,
-    flexDirection: 'row-reverse',
-    gap: 8,
+    alignItems: 'center',
+  },
+  pillGap: {
+    width: 8,
   },
   categoryPill: {
     paddingHorizontal: 14,

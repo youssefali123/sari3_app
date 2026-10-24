@@ -56,11 +56,18 @@ export const FavoriteStoreCard = React.memo(function FavoriteStoreCard({ store, 
           </Text>
           <FavoriteButton kind="store" targetId={store.id} />
         </View>
-        {categoryLine ? (
-          <Text style={styles.category} numberOfLines={1}>
-            {categoryLine}
-          </Text>
-        ) : null}
+        <View style={styles.categoryRow}>
+          {store.departmentName ? (
+            <View style={styles.departmentBadge}>
+              <Text style={styles.departmentBadgeText}>{store.departmentName}</Text>
+            </View>
+          ) : null}
+          {categoryLine ? (
+            <Text style={styles.category} numberOfLines={1}>
+              {categoryLine}
+            </Text>
+          ) : null}
+        </View>
         <View style={styles.metaRow}>
           {store.rating !== null ? (
             <View style={styles.ratingRow}>
@@ -126,9 +133,27 @@ const createStyles = (theme: ReturnType<typeof useTheme>['theme']) =>
       color: theme.colors.textPrimary,
       flexShrink: 1,
     },
+    categoryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    departmentBadge: {
+      backgroundColor: theme.colors.primarySubtle ?? 'rgba(245, 189, 22, 0.15)',
+      borderRadius: theme.radii.pill,
+      paddingHorizontal: 8,
+      paddingVertical: 2,
+    },
+    departmentBadgeText: {
+      ...theme.typography.caption,
+      color: theme.colors.primary,
+      fontWeight: '700',
+      fontSize: 10,
+    },
     category: {
       ...theme.typography.caption,
       color: theme.colors.textMuted,
+      flexShrink: 1,
     },
     metaRow: {
       flexDirection: 'row',

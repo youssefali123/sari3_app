@@ -34,17 +34,16 @@ import {
 const favoritesRepository: FavoritesRepository = new SupabaseFavoritesRepository();
 const storeRepository: StoreRepository = new SupabaseStoreRepository();
 
-type FavoritesTab = 'restaurants' | 'markets' | 'products';
+type FavoritesTab = 'stores' | 'products';
 
 const TABS: { key: FavoritesTab; label: string }[] = [
-  { key: 'restaurants', label: 'مطاعم' },
-  { key: 'markets', label: 'متاجر' },
+  { key: 'stores', label: 'متاجر' },
   { key: 'products', label: 'منتجات' },
 ];
 
 /**
- * المفضلة (SOURCE-aligned design):
- * BrandHeader, segmented pill bar, rich favorite cards, and bottom tip card.
+ * المفضلة:
+ * Consolidated two-tab view ([ متاجر | منتجات ]) with department badges.
  * Keeps existing favorites data flow (repository + area scoping) 100% intact.
  */
 export default function FavoritesScreen() {
@@ -52,7 +51,7 @@ export default function FavoritesScreen() {
   const router = useAppRouter();
   const colors = useColors();
   const { user, isLoading: isAuthLoading } = useAuth();
-  const [tab, setTab] = useState<FavoritesTab>('restaurants');
+  const [tab, setTab] = useState<FavoritesTab>('stores');
   const [refreshing, setRefreshing] = useState(false);
   const customerId = useCurrentCustomerId();
   const { selectedAreaId, selectedAreaName } = useSelectedArea();
@@ -79,16 +78,13 @@ export default function FavoritesScreen() {
     enabled: Boolean(customerId),
   });
 
-  // Feature 006: favorites scoped to the selected browsing area.
+  // Feature 014: All favorite stores across all departments, scoped to selected area.
   const visibleStores = useMemo(() => {
     if (!stores) return [];
-    const scoped = selectedAreaId
+    return selectedAreaId
       ? stores.filter((s) => s.areaId === selectedAreaId)
       : stores;
-    return tab === 'restaurants'
-      ? scoped.filter((s) => s.type === 'restaurant')
-      : scoped.filter((s) => s.type === 'market');
-  }, [stores, selectedAreaId, tab]);
+  }, [stores, selectedAreaId]);
 
   const { data: areaMapStores, refetch: refetchAreaMap } = useQuery({
     queryKey: ['stores', 'areaMap'],
